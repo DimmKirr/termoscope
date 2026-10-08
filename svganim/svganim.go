@@ -36,11 +36,15 @@ type Screen interface {
 	CellAt(x, y int) *uv.Cell
 }
 
-// Cell is one captured screen cell.
+// Cell is one captured screen cell. Width is the number of columns the cell
+// occupies: 1 for ordinary text, 2 for emoji and other wide glyphs.
 type Cell struct {
 	Content string
 	Fg      color.Color // nil means the default foreground
+	Width   int
 }
+
+func (c Cell) width() int { return max(c.Width, 1) }
 
 // Frame is one captured screen with its timestamp relative to the start.
 type Frame struct {
@@ -74,7 +78,7 @@ func Snapshot(s Screen, at time.Duration) Frame {
 			if content == "" {
 				content = " "
 			}
-			row = append(row, Cell{Content: content, Fg: c.Style.Fg})
+			row = append(row, Cell{Content: content, Fg: c.Style.Fg, Width: max(c.Width, 1)})
 		}
 		f.Lines[y] = row
 	}
@@ -90,7 +94,7 @@ func sameFrame(a, b Frame) bool {
 			return false
 		}
 		for x := range a.Lines[y] {
-			if a.Lines[y][x].Content != b.Lines[y][x].Content || !colorEqual(a.Lines[y][x].Fg, b.Lines[y][x].Fg) {
+			if a.Lines[y][x].Content != b.Lines[y][x].Content || a.Lines[y][x].width() != b.Lines[y][x].width() || !colorEqual(a.Lines[y][x].Fg, b.Lines[y][x].Fg) {
 				return false
 			}
 		}
@@ -139,8 +143,8 @@ func Bounds(frames []Frame) (w, h int) {
 	w, h = 1, 1
 	for _, f := range frames {
 		for y, row := range f.Lines {
-			if t := strings.TrimRight(rowText(row), " "); t != "" {
-				if n := len([]rune(t)); n > w {
+			if n := rowCols(row); n > 0 {
+				if n > w {
 					w = n
 				}
 				if y+1 > h {
@@ -160,6 +164,19 @@ func rowText(row []Cell) string {
 	return b.String()
 }
 
+// rowCols returns the number of columns up to the last non-blank cell,
+// counting wide cells by their width.
+func rowCols(row []Cell) int {
+	cols, last := 0, 0
+	for _, c := range row {
+		cols += c.width()
+		if c.Content != " " {
+			last = cols
+		}
+	}
+	return last
+}
+
 // Options controls rendering. Zero values take the documented defaults.
 //
 // Geometry derives from the font so text keeps its natural spacing: a cell
@@ -176,6 +193,45 @@ type Options struct {
 	Foreground string        // default #c9d1d9
 	Hold       time.Duration // how long the last frame stays before looping, default 2s
 	NoEmbed    bool          // skip the embedded font (smaller output, viewer font)
+	EmbedEmoji bool          // also embed Noto Emoji (monochrome, ~750 KB) instead of relying on the viewer's color emoji font
+	MinCols    int           // minimum canvas width in cells; the canvas still grows to fit content
+	MinRows    int           // minimum canvas height in cells; the canvas still grows to fit content
+}
+
+// canvas returns the canvas size in cells: the content bounds, widened to
+// at least MinCols x MinRows. The background rect covers the whole canvas.
+func (o Options) canvas(frames []Frame) (cols, rows int) {
+	cols, rows = Bounds(frames)
+	return max(cols, o.MinCols), max(rows, o.MinRows)
+}
+
+// colorEmojiFonts are the color emoji faces shipped by browsers and
+// operating systems, in the order the web community settled on: Firefox's
+// bundled Twemoji first (it is newer than most OS fonts), then macOS/iOS,
+// Windows (Segoe UI Symbol covers older Windows in monochrome), Android,
+// ChromeOS and Linux, and two legacy Linux/Android names. A browser only
+// consults them for glyphs the text face lacks.
+var colorEmojiFonts = []string{
+	"Twemoji Mozilla",
+	"Apple Color Emoji",
+	"Segoe UI Emoji",
+	"Segoe UI Symbol",
+	"Noto Color Emoji",
+	"EmojiOne Color",
+	"Android Emoji",
+}
+
+// fontFamily is the CSS font-family stack: the embedded text face, then the
+// bundled emoji face when embedded, then the color emoji fonts, then a
+// generic fallback.
+func (o Options) fontFamily() string {
+	fams := []string{fonts.Family}
+	if o.EmbedEmoji {
+		fams = append(fams, fonts.EmojiFamily)
+	}
+	fams = append(fams, colorEmojiFonts...)
+	fams = append(fams, "monospace")
+	return strings.Join(fams, ", ")
 }
 
 func (o Options) withDefaults() Options {
@@ -219,7 +275,7 @@ func Render(frames []Frame, opts Options) []byte {
 	if len(frames) == 0 {
 		frames = []Frame{{}}
 	}
-	cols, rows := Bounds(frames)
+	cols, rows := o.canvas(frames)
 	total := frames[len(frames)-1].At + o.Hold
 
 	var b bytes.Buffer
@@ -254,10 +310,10 @@ func Render(frames []Frame, opts Options) []byte {
 // RenderStatic returns a non-animated SVG of a single frame.
 func RenderStatic(f Frame, opts Options) []byte {
 	o := opts.withDefaults()
-	cols, rows := Bounds([]Frame{f})
+	cols, rows := o.canvas([]Frame{f})
 	var b bytes.Buffer
 	writeHeader(&b, o, cols, rows)
-	if !o.NoEmbed {
+	if !o.NoEmbed || o.EmbedEmoji {
 		b.WriteString("<style>\n")
 		writeFontFace(&b, o)
 		b.WriteString("</style>\n")
@@ -272,16 +328,19 @@ func writeHeader(b *bytes.Buffer, o Options, cols, rows int) {
 	cw, ch := o.cell()
 	width := o.Padding*2 + float64(cols)*cw
 	height := o.Padding*2 + float64(rows)*ch
-	fmt.Fprintf(b, `<svg xmlns="http://www.w3.org/2000/svg" width="%s" height="%s" viewBox="0 0 %s %s" font-family="%s, monospace" font-size="%s">`+"\n",
-		num(width), num(height), num(width), num(height), fonts.Family, num(o.fontSize()))
+	fmt.Fprintf(b, `<svg xmlns="http://www.w3.org/2000/svg" width="%s" height="%s" viewBox="0 0 %s %s" font-family="%s" font-size="%s">`+"\n",
+		num(width), num(height), num(width), num(height), o.fontFamily(), num(o.fontSize()))
 }
 
 func writeFontFace(b *bytes.Buffer, o Options) {
-	if o.NoEmbed {
-		return
+	if !o.NoEmbed {
+		fmt.Fprintf(b, "@font-face{font-family:'%s';src:url(data:font/woff2;base64,%s) format('woff2')}\n",
+			fonts.Family, base64.StdEncoding.EncodeToString(fonts.JetBrainsMonoWOFF2))
 	}
-	fmt.Fprintf(b, "@font-face{font-family:'%s';src:url(data:font/woff2;base64,%s) format('woff2')}\n",
-		fonts.Family, base64.StdEncoding.EncodeToString(fonts.JetBrainsMonoWOFF2))
+	if o.EmbedEmoji {
+		fmt.Fprintf(b, "@font-face{font-family:'%s';src:url(data:font/woff;base64,%s) format('woff')}\n",
+			fonts.EmojiFamily, base64.StdEncoding.EncodeToString(fonts.NotoEmojiWOFF))
+	}
 }
 
 func writeBackground(b *bytes.Buffer, o Options) {
@@ -289,8 +348,10 @@ func writeBackground(b *bytes.Buffer, o Options) {
 }
 
 // writeFrame emits one frame's shapes: rects for block glyphs and rules,
-// text runs grouped by color for everything else. Tiles and text share the
-// cell's vertical center.
+// text runs grouped by color for everything else, and one centered <text>
+// per wide glyph (emoji) so its natural advance never disturbs the
+// monospace grid. Tiles and text share the cell's vertical center. The
+// column (col) advances by each cell's width; the slice index (x) by one.
 func writeFrame(b *bytes.Buffer, f Frame, o Options, cols, rows int) {
 	cw, ch := o.cell()
 	t := o.tile()
@@ -299,36 +360,46 @@ func writeFrame(b *bytes.Buffer, f Frame, o Options, cols, rows int) {
 		top := o.Padding + float64(y)*ch
 		mid := top + ch/2
 		baseline := mid + t/2 // cap height == t, centered on mid
-		x := 0
-		for x < len(row) && x < cols {
+		x, col := 0, 0
+		for x < len(row) && col < cols {
 			c := row[x]
 			fill := o.Foreground
 			if c.Fg != nil {
 				fill = hex(c.Fg)
 			}
-			left := o.Padding + float64(x)*cw
-			switch c.Content {
-			case "▄", "▀":
+			left := o.Padding + float64(col)*cw
+			switch {
+			case c.Content == "▄" || c.Content == "▀":
 				writeRect(b, left, mid-t/2, t, t, o.Radius, fill)
 				x++
-			case "█":
+				col++
+			case c.Content == "█":
 				writeRect(b, left, top, cw, ch, o.Radius, fill)
 				x++
-			case "─":
+				col++
+			case c.Content == "─":
 				n := 0
 				for x+n < len(row) && row[x+n].Content == "─" && colorEqual(row[x+n].Fg, c.Fg) {
 					n++
 				}
 				writeRect(b, left, mid-0.5, float64(n)*cw, 1, 0, fill)
 				x += n
-			case " ":
+				col += n
+			case c.Content == " ":
 				x++
+				col++
+			case c.width() > 1:
+				span := float64(c.width()) * cw
+				fmt.Fprintf(b, `<text x="%s" y="%s" fill="%s" text-anchor="middle">%s</text>`+"\n",
+					num(left+span/2), num(baseline), fill, escape(c.Content))
+				x++
+				col += c.width()
 			default:
-				n := 0
+				n, width := 0, 0
 				var run strings.Builder
 				for x+n < len(row) {
 					nc := row[x+n]
-					if isBlock(nc.Content) || !colorEqual(nc.Fg, c.Fg) {
+					if isBlock(nc.Content) || nc.width() > 1 || !colorEqual(nc.Fg, c.Fg) {
 						break
 					}
 					if nc.Content == " " && (x+n+1 >= len(row) || row[x+n+1].Content == " ") {
@@ -336,12 +407,14 @@ func writeFrame(b *bytes.Buffer, f Frame, o Options, cols, rows int) {
 					}
 					run.WriteString(nc.Content)
 					n++
+					width++
 				}
 				text := strings.TrimRight(run.String(), " ")
-				width := len([]rune(text))
+				tw := width - (len(run.String()) - len(text)) // trailing spaces are one byte and one column each
 				fmt.Fprintf(b, `<text x="%s" y="%s" fill="%s" textLength="%s" lengthAdjust="spacing">%s</text>`+"\n",
-					num(left), num(baseline), fill, num(float64(width)*cw), escape(text))
+					num(left), num(baseline), fill, num(float64(tw)*cw), escape(text))
 				x += n
+				col += width
 			}
 		}
 	}

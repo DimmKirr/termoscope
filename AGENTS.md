@@ -46,17 +46,24 @@ which import only `internal/fonts` and `ultraviolet` cell types. `raster` and `s
     and `Dir(t)` yields `test/results/<runID>-<testName>` where `runID` is one UTC timestamp fixed per test binary
     run. `Record` starts `svganim.Record` in a goroutine and writes `recording.svg` from `t.Cleanup`, closing the
     terminal first so the recording ends where the test ends.
-- **`raster`**: screen to `*image.RGBA` at 2x using the embedded TTF via `x/image/font/opentype`. Cell geometry
+- **`raster`**: screen to `*image.RGBA` at 2x using the embedded TTFs via `x/image/font/opentype`. Cell geometry
   constants (`FontSize=28`, `CellWidth=17`, `CellHeight=35`) encode a 14px font at 2x with a 0.6em advance and
-  1.25em line.
-- **`svganim`**: `Snapshot` copies a `Screen` into a `Frame` (skips width-0 wide-glyph continuations, keeps only
-  content + fg color); `Record` samples until `Done()` closes and drops identical consecutive frames; `Render`
-  emits one `<g>` per frame toggled by a CSS keyframe animation (what GitHub renders inside `<img>`),
+  1.25em line. Per cell it checks the first rune against JetBrains Mono's cmap; if missing and present in Noto
+  Emoji, the glyph is drawn with the emoji face centered in the cell's `Width`-cell span. No shaping: clusters
+  draw as their first rune.
+- **`svganim`**: `Snapshot` copies a `Screen` into a `Frame` (skips width-0 wide-glyph continuations, keeps
+  content, fg color and `Width`); `Record` samples until `Done()` closes and drops identical consecutive frames;
+  `Render` emits one `<g>` per frame toggled by a CSS keyframe animation (what GitHub renders inside `<img>`),
   `RenderStatic` emits one frame. Geometry derives from `fonts.Advance`/`fonts.CapHeight`: block glyphs `▄ ▀ █`
-  become rounded squares, `─` a thin bar, text stays as `<text>`. The woff2 font is embedded as a data URI unless
-  `Options.NoEmbed`.
-- **`internal/fonts`**: `go:embed` of JetBrains Mono TTF (for raster) and WOFF2 (for SVG) plus the em metrics both
-  renderers share. The font is OFL-licensed; keep `OFL.txt` alongside.
+  become rounded squares, `─` a thin bar, text stays as `<text>`. `writeFrame` tracks the column separately from
+  the slice index because wide cells occupy two columns but one slice entry; each wide glyph is its own centered
+  `<text>` so its natural advance never shifts the grid. The font-family stack is JetBrains Mono, then (if
+  `Options.EmbedEmoji`) Noto Emoji, then the platform color emoji fonts, then `monospace`. JetBrains Mono woff2 is
+  embedded as a data URI unless `Options.NoEmbed`; Noto Emoji woff only with `EmbedEmoji` (about 750 KB).
+- **`internal/fonts`**: `go:embed` of JetBrains Mono (TTF for raster, WOFF2 for SVG) and Noto Emoji Regular (static
+  instance from Google Fonts; TTF for raster, WOFF for SVG) plus the em metrics both renderers share. Both fonts
+  are OFL-licensed; keep `OFL.txt` and `OFL-NotoEmoji.txt` alongside. Go's `x/image` cannot render color fonts
+  (CBDT/COLR/sbix), which is why the bundled emoji face is the monochrome Noto Emoji.
 - **`cmd/termproof`**: `record` subcommand wrapping `Start` + `svganim.Record` + `raster.Render`. Exit code is the
   child's; the recording is written regardless.
 
@@ -66,8 +73,12 @@ a PTY.
 
 ## Conventions
 
-- Tests that need a real program build `examples/countdown` into `t.TempDir()` (see `test/e2e`). Pass
-  `-pace` to keep runs short and `-buildvcs=false` when building from a tmp dir.
-- When changing SVG or raster geometry, run `task example` and inspect `docs/assets/countdown.svg` in a browser;
-  librsvg-based viewers ignore the embedded font and are not representative.
+- Tests that need a real program build an `examples/*` program into `t.TempDir()` (see `test/e2e`; `countdown`
+  covers tiles and colors, `emoji` covers wide cells and the emoji font fallback). Pass `-pace` to keep runs
+  short and `-buildvcs=false` when building from a tmp dir. Each example must fit 40x4 cells because
+  `task example` and the CI workflows record every `examples/*/` at that size; `task example` also passes
+  `-min-cols 20 -min-rows 4` so every README recording shares one canvas size (`Options.MinCols/MinRows`).
+- When changing SVG or raster geometry, run `task example` and inspect `docs/assets/*.svg` in a browser;
+  librsvg-based viewers ignore the embedded font and are not representative. A container without any emoji
+  font shows tofu for emoji in non-embedded SVGs; that is the viewer, not a bug.
 - README's Quick start is a verbatim copy of `test/e2e/example_countdown_test.go`; keep them in sync.

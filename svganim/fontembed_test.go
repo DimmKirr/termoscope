@@ -165,3 +165,82 @@ func svgSize(t *testing.T, svg []byte) (w, h int) {
 	}
 	return get("width"), get("height")
 }
+
+// TestEmbeddedEmojiFont_IsUsedByBrowser proves Options.EmbedEmoji makes a
+// browser draw emoji from the bundled Noto Emoji: the emoji cells must
+// render differently with and without the embedded face. Without it the
+// viewer falls back to whatever emoji font it has, if any.
+func TestEmbeddedEmojiFont_IsUsedByBrowser(t *testing.T) {
+	bin := browser()
+	if bin == "" {
+		t.Skip("no headless Chromium/Chrome on PATH")
+	}
+	if testing.Short() {
+		t.Skip("browser render is slow")
+	}
+
+	emu := vt.NewEmulator(20, 1)
+	_, _ = emu.WriteString("Ship 🚀 ✅ ok")
+	frame := Snapshot(emu, 0)
+
+	with := RenderStatic(frame, Options{EmbedEmoji: true})
+	without := RenderStatic(frame, Options{})
+	w, h := svgSize(t, with)
+
+	dir := t.TempDir()
+	withSVG := filepath.Join(dir, "emoji.svg")
+	withoutSVG := filepath.Join(dir, "plain.svg")
+	if err := os.WriteFile(withSVG, with, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(withoutSVG, without, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a := screenshot(t, bin, withSVG, filepath.Join(dir, "emoji.png"), w, h)
+	b := screenshot(t, bin, withoutSVG, filepath.Join(dir, "plain.png"), w, h)
+
+	emojiDiff, textDiff := wideDiff(a, b, frame, Options{}.withDefaults())
+	t.Logf("differing pixels: emoji cells %d, text cells %d", emojiDiff, textDiff)
+	if emojiDiff == 0 {
+		t.Fatal("emoji render identically with and without the embedded Noto Emoji: the browser is not using it")
+	}
+	if textDiff != 0 {
+		t.Fatalf("plain text must not depend on the emoji font, got %d differing pixels", textDiff)
+	}
+}
+
+// wideDiff counts differing pixels inside wide (emoji) cells and inside
+// single-width text cells separately, walking columns by cell width.
+func wideDiff(a, b image.Image, f Frame, o Options) (wide, text int) {
+	cw, ch := o.cell()
+	const scale = 2
+	for y, row := range f.Lines {
+		col := 0
+		for _, c := range row {
+			w := c.width()
+			if c.Content != " " {
+				x0 := int((o.Padding + float64(col)*cw) * scale)
+				y0 := int((o.Padding + float64(y)*ch) * scale)
+				x1 := int((o.Padding + float64(col+w)*cw) * scale)
+				y1 := int((o.Padding + float64(y+1)*ch) * scale)
+				n := 0
+				for py := y0; py < y1 && py < a.Bounds().Max.Y; py++ {
+					for px := x0; px < x1 && px < a.Bounds().Max.X; px++ {
+						r1, g1, b1, _ := a.At(px, py).RGBA()
+						r2, g2, b2, _ := b.At(px, py).RGBA()
+						if r1 != r2 || g1 != g2 || b1 != b2 {
+							n++
+						}
+					}
+				}
+				if w > 1 {
+					wide += n
+				} else {
+					text += n
+				}
+			}
+			col += w
+		}
+	}
+	return wide, text
+}

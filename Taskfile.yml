@@ -11,10 +11,10 @@ tasks:
       - go vet ./...
       - golangci-lint run ./...
   example:
-    desc: Record the countdown example into docs/assets/countdown.svg
+    desc: Record every example into docs/assets/<name>.svg and .png
     cmds:
       - mkdir -p docs/assets
-      - go run ./cmd/termproof record -o docs/assets/countdown.svg -png docs/assets/countdown.png -cols 40 -rows 4 -- go run ./examples/countdown
+      - for d in examples/*/; do n=$(basename "$d"); go run ./cmd/termproof record -o "docs/assets/$n.svg" -png "docs/assets/$n.png" -cols 40 -rows 4 -min-cols 20 -min-rows 4 -- go run "./$d"; done
   tidy:
     cmds:
       - go mod tidy

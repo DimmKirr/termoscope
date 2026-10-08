@@ -61,6 +61,9 @@ func record(args []string, stderr io.Writer) int {
 	hold := fs.Duration("hold", 2*time.Second, "how long the last frame stays before the loop restarts")
 	timeout := fs.Duration("timeout", 2*time.Minute, "kill the program after this long")
 	fontSize := fs.Float64("font-size", 16, "SVG font size in px")
+	embedEmoji := fs.Bool("embed-emoji", false, "embed the bundled Noto Emoji face in the SVG (monochrome, +~750 KB) instead of relying on the viewer's color emoji font")
+	minCols := fs.Int("min-cols", 0, "minimum SVG canvas width in cells (0 = fit content)")
+	minRows := fs.Int("min-rows", 0, "minimum SVG canvas height in cells (0 = fit content)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -82,7 +85,7 @@ func record(args []string, stderr io.Writer) int {
 	frames := svganim.Record(tm, *sample)
 	exitErr := tm.Wait()
 
-	svg := svganim.Render(frames, svganim.Options{Hold: *hold, FontSize: *fontSize})
+	svg := svganim.Render(frames, svganim.Options{Hold: *hold, FontSize: *fontSize, EmbedEmoji: *embedEmoji, MinCols: *minCols, MinRows: *minRows})
 	if err := os.WriteFile(*out, svg, 0o644); err != nil {
 		say(stderr, "termproof record:", err)
 		return 1

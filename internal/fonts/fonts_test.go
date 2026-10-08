@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"golang.org/x/image/font/opentype"
+	"golang.org/x/image/font/sfnt"
 )
 
 func TestTTF_ParsesAndMatchesMetrics(t *testing.T) {
@@ -23,5 +24,22 @@ func TestWOFF2_HasSignature(t *testing.T) {
 	}
 	if len(JetBrainsMonoWOFF2) > 200_000 {
 		t.Fatalf("woff2 unexpectedly large: %d bytes", len(JetBrainsMonoWOFF2))
+	}
+}
+
+func TestNotoEmoji_ParsesAndCoversEmoji(t *testing.T) {
+	f, err := opentype.Parse(NotoEmojiTTF)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf sfnt.Buffer
+	for _, r := range []rune{'🚀', '✅', '🎉', '⏳'} {
+		idx, err := f.GlyphIndex(&buf, r)
+		if err != nil || idx == 0 {
+			t.Errorf("Noto Emoji lacks %q (%U): idx=%d err=%v", r, r, idx, err)
+		}
+	}
+	if !bytes.HasPrefix(NotoEmojiWOFF, []byte("wOFF")) {
+		t.Fatal("embedded Noto Emoji woff missing wOFF signature")
 	}
 }
