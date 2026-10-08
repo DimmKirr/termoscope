@@ -167,3 +167,53 @@ func TestTrim_CropsToContentCells(t *testing.T) {
 		t.Errorf("empty screen trims to one cell, got %v", b)
 	}
 }
+
+// inkBounds returns the bounding box of non-background pixels inside r.
+func inkBounds(img *image.RGBA, r image.Rectangle) image.Rectangle {
+	var b image.Rectangle
+	for y := r.Min.Y; y < r.Max.Y; y++ {
+		for x := r.Min.X; x < r.Max.X; x++ {
+			c := img.RGBAAt(x, y)
+			if c.R != 0x0d || c.G != 0x11 || c.B != 0x17 {
+				b = b.Union(image.Rect(x, y, x+1, y+1))
+			}
+		}
+	}
+	return b
+}
+
+// TestRender_ColorEmojiIsEmSized proves a Twemoji picture is drawn at the
+// font's em size (FontSize px), like text and like the SVG's emoji text at
+// font-size 16, not stretched to the two-cell box. ✅ fills its Twemoji
+// canvas edge to edge, so its ink box is the picture box.
+func TestRender_ColorEmojiIsEmSized(t *testing.T) {
+	emu := vt.NewEmulator(4, 1)
+	_, _ = emu.WriteString("✅")
+	img, err := Render(emu)
+	if err != nil {
+		t.Fatal(err)
+	}
+	span := image.Rect(0, 0, 2*CellWidth, CellHeight)
+	ink := inkBounds(img, span)
+	if ink.Dx() > FontSize || ink.Dy() > FontSize {
+		t.Fatalf("emoji ink %dx%d exceeds the %dpx em", ink.Dx(), ink.Dy(), FontSize)
+	}
+	if ink.Dx() < FontSize-6 || ink.Dy() < FontSize-6 {
+		t.Fatalf("emoji ink %dx%d is far smaller than the %dpx em", ink.Dx(), ink.Dy(), FontSize)
+	}
+	// Centered in the span: left and right slack within a pixel of each other,
+	// same for top and bottom.
+	if l, r := ink.Min.X, span.Max.X-ink.Max.X; abs(l-r) > 1 {
+		t.Errorf("not horizontally centered: left %d, right %d", l, r)
+	}
+	if tp, bt := ink.Min.Y, span.Max.Y-ink.Max.Y; abs(tp-bt) > 1 {
+		t.Errorf("not vertically centered: top %d, bottom %d", tp, bt)
+	}
+}
+
+func abs(i int) int {
+	if i < 0 {
+		return -i
+	}
+	return i
+}

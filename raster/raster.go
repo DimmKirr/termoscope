@@ -169,11 +169,12 @@ func RenderWith(s Screen, o Options) (*image.RGBA, error) {
 	return img, nil
 }
 
-// colorEmoji returns the Twemoji picture for cluster scaled to fit a span
-// px wide and CellHeight tall with a one pixel margin, or nil when Twemoji
-// has no picture for it. Scaled pictures are cached per cluster and span.
+// colorEmoji returns the Twemoji picture for cluster scaled to an em-sized
+// square (FontSize px, what the SVG's emoji text occupies at the same font
+// size), shrunk only if the span is narrower than that, or nil when Twemoji
+// has no picture for it. Scaled pictures are cached per cluster and side.
 func colorEmoji(cluster string, span int) *image.RGBA {
-	side := min(span, CellHeight) - 2
+	side := min(span, FontSize)
 	if side <= 0 {
 		return nil
 	}

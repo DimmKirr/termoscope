@@ -53,7 +53,8 @@ Strict one-way dependency flow: `termproof` (root) imports `raster`, `svganim` a
   advance and a 1.2em line (19.2 and 38.4 rounded), so a GIF or PNG shown at half size lines up with the SVG
   to within 1%. Per cell: if the cell is 2 wide, contains U+FE0F, or its first rune is missing from JetBrains
   Mono's cmap, it is emoji. Emoji are drawn from `internal/twemoji` by whole grapheme cluster (color, default),
-  scaled with CatmullRom into a square inside the `Width`-cell span and cached per cluster; with
+  scaled with CatmullRom into an em-sized square (`FontSize` px, what the SVG's emoji text occupies) centered in
+  the `Width`-cell span and cached per cluster; with
   `Options.MonoEmoji`, or when Twemoji has no picture, the first rune is drawn with the Noto Emoji face in the
   fg color. The gate on JetBrains Mono's cmap keeps `#`, `*`, `©` as text even though Twemoji has pictures.
 - **`internal/twemoji`**: `go:embed` of the Twemoji 17.0.3 72px PNG set (4009 files, about 4 MB, CC-BY 4.0,
