@@ -1,4 +1,4 @@
-// Package e2e is the worked example for termproof: build a binary, run it
+// Package e2e is the worked example for termoscope: build a binary, run it
 // under a headless PTY, wait for screen states, assert on cells, and leave
 // PNG, SVG and an animated recording under test/results/<ts>-<test>/.
 package e2e
@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dimmkirr/termproof"
+	"github.com/dimmkirr/termoscope"
 )
 
 func buildCountdown(t *testing.T) string {
@@ -38,16 +38,16 @@ func TestExample_Countdown(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	tm, err := termproof.Start(ctx, 40, 4, bin, "-pace=120ms")
+	tm, err := termoscope.Start(ctx, 40, 4, bin, "-pace=120ms")
 	if err != nil {
 		t.Fatal(err)
 	}
-	termproof.Record(t, tm) // recording.svg written on cleanup
+	termoscope.Record(t, tm) // recording.svg written on cleanup
 
 	if _, err := tm.WaitFor(ctx, "Countdown"); err != nil {
 		t.Fatal(err)
 	}
-	termproof.SavePNG(t, tm, "start")
+	termoscope.SavePNG(t, tm, "start")
 
 	if _, err := tm.WaitFor(ctx, "Liftoff"); err != nil {
 		t.Fatal(err)
@@ -55,8 +55,8 @@ func TestExample_Countdown(t *testing.T) {
 	if err := tm.Wait(); err != nil {
 		t.Fatalf("countdown exited with %v", err)
 	}
-	termproof.SavePNG(t, tm, "liftoff")
-	termproof.SaveSVG(t, tm, "liftoff")
+	termoscope.SavePNG(t, tm, "liftoff")
+	termoscope.SaveSVG(t, tm, "liftoff")
 
 	// Every tile on the first row is green once the countdown finishes.
 	// "Countdown  " is 11 cells wide; tiles sit at 11, 13, 15.
@@ -71,7 +71,7 @@ func TestExample_Countdown(t *testing.T) {
 	}
 
 	// Artifacts exist and are not empty.
-	dir := termproof.Dir(t)
+	dir := termoscope.Dir(t)
 	for _, name := range []string{"start.png", "liftoff.png", "liftoff.svg"} {
 		st, err := os.Stat(filepath.Join(dir, name))
 		if err != nil || st.Size() == 0 {

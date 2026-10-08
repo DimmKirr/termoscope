@@ -1,4 +1,4 @@
-// Package termproof runs a program under a headless pseudo-terminal so a
+// Package termoscope runs a program under a headless pseudo-terminal so a
 // test can read what a user would see, wait for screen states, and keep
 // PNG and animated SVG evidence of every checked screen.
 //
@@ -7,7 +7,7 @@
 // or [Terminal.WaitUntil], and calls [SavePNG] and [SaveSVG] at each
 // assertion point. Artifacts go to test/results/<dateTimeISO>-<testName>/
 // under the module root of the test being run.
-package termproof
+package termoscope
 
 import (
 	"context"

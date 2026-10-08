@@ -1,4 +1,4 @@
-module github.com/dimmkirr/termproof
+module github.com/dimmkirr/termoscope
 
 go 1.26.0
 

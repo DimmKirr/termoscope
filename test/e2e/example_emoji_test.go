@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dimmkirr/termproof"
-	"github.com/dimmkirr/termproof/raster"
+	"github.com/dimmkirr/termoscope"
+	"github.com/dimmkirr/termoscope/raster"
 )
 
 func buildEmoji(t *testing.T) string {
@@ -32,16 +32,16 @@ func TestExample_Emoji(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	tm, err := termproof.Start(ctx, 40, 4, bin, "-pace=120ms")
+	tm, err := termoscope.Start(ctx, 40, 4, bin, "-pace=120ms")
 	if err != nil {
 		t.Fatal(err)
 	}
-	termproof.Record(t, tm)
+	termoscope.Record(t, tm)
 
 	if _, err := tm.WaitFor(ctx, "Release"); err != nil {
 		t.Fatal(err)
 	}
-	termproof.SavePNG(t, tm, "start")
+	termoscope.SavePNG(t, tm, "start")
 
 	if _, err := tm.WaitFor(ctx, "shipped"); err != nil {
 		t.Fatal(err)
@@ -49,8 +49,8 @@ func TestExample_Emoji(t *testing.T) {
 	if err := tm.Wait(); err != nil {
 		t.Fatalf("emoji example exited with %v", err)
 	}
-	pngPath := termproof.SavePNG(t, tm, "shipped")
-	termproof.SaveSVG(t, tm, "shipped")
+	pngPath := termoscope.SavePNG(t, tm, "shipped")
+	termoscope.SaveSVG(t, tm, "shipped")
 
 	// "Release " is 8 cells; the rocket occupies columns 8-9; " v1.2" starts at 10.
 	if c := tm.CellAt(8, 0); c == nil || c.Content != "🚀" || c.Width != 2 {
@@ -93,7 +93,7 @@ func TestExample_Emoji(t *testing.T) {
 		t.Error("rocket cells are blank in the PNG: emoji font not used")
 	}
 
-	dir := termproof.Dir(t)
+	dir := termoscope.Dir(t)
 	for _, name := range []string{"start.png", "shipped.png", "shipped.svg"} {
 		st, err := os.Stat(filepath.Join(dir, name))
 		if err != nil || st.Size() == 0 {

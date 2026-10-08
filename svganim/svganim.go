@@ -20,7 +20,7 @@ import (
 
 	uv "github.com/charmbracelet/ultraviolet"
 
-	"github.com/dimmkirr/termproof/internal/fonts"
+	"github.com/dimmkirr/termoscope/internal/fonts"
 )
 
 // Source is a terminal screen whose process signals completion via Done.

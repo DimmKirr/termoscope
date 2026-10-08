@@ -1,4 +1,4 @@
-// Command countdown is a tiny in-place updating TUI used by termproof's own
+// Command countdown is a tiny in-place updating TUI used by termoscope's own
 // tests and README. It redraws a two-line screen each step without raw
 // mode or the alternate screen, then exits 0.
 //

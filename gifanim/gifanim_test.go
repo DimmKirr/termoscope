@@ -8,8 +8,8 @@ import (
 
 	"github.com/charmbracelet/x/vt"
 
-	"github.com/dimmkirr/termproof/raster"
-	"github.com/dimmkirr/termproof/svganim"
+	"github.com/dimmkirr/termoscope/raster"
+	"github.com/dimmkirr/termoscope/svganim"
 )
 
 func green(s string) string { return "\x1b[38;2;57;211;83m" + s + "\x1b[0m" }

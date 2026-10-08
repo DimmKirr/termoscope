@@ -1,4 +1,4 @@
-package termproof
+package termoscope
 
 import (
 	"image"
@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dimmkirr/termproof/gifanim"
-	"github.com/dimmkirr/termproof/raster"
-	"github.com/dimmkirr/termproof/svganim"
+	"github.com/dimmkirr/termoscope/gifanim"
+	"github.com/dimmkirr/termoscope/raster"
+	"github.com/dimmkirr/termoscope/svganim"
 )
 
 var (
@@ -69,11 +69,11 @@ func Dir(t *testing.T) string {
 
 	r, err := resultsRoot()
 	if err != nil {
-		t.Fatalf("termproof: locate module root: %v", err)
+		t.Fatalf("termoscope: locate module root: %v", err)
 	}
 	dir := filepath.Join(r, "test", "results", id+"-"+sanitize(t.Name()))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatalf("termproof: mkdir %s: %v", dir, err)
+		t.Fatalf("termoscope: mkdir %s: %v", dir, err)
 	}
 	return dir
 }
@@ -85,17 +85,17 @@ func SavePNG(t *testing.T, s raster.Screen, name string) string {
 	t.Helper()
 	img, err := raster.Render(raster.Trim(s, 0, 0))
 	if err != nil {
-		t.Fatalf("termproof: render: %v", err)
+		t.Fatalf("termoscope: render: %v", err)
 	}
 	img = raster.Pad([]*image.RGBA{img}, raster.Margin)[0]
 	path := filepath.Join(Dir(t), name+".png")
 	f, err := os.Create(path)
 	if err != nil {
-		t.Fatalf("termproof: create %s: %v", path, err)
+		t.Fatalf("termoscope: create %s: %v", path, err)
 	}
 	defer func() { _ = f.Close() }()
 	if err := png.Encode(f, img); err != nil {
-		t.Fatalf("termproof: encode: %v", err)
+		t.Fatalf("termoscope: encode: %v", err)
 	}
 	t.Logf("screenshot: %s", path)
 	return path
@@ -134,12 +134,12 @@ func RecordWith(t *testing.T, tm *Terminal, interval time.Duration, opts svganim
 			writeFile(t, filepath.Join(Dir(t), "recording.svg"), svganim.Render(fr, opts))
 			g, err := gifanim.Render(fr, gifanim.Options{Hold: opts.Hold, MinCols: opts.MinCols, MinRows: opts.MinRows})
 			if err != nil {
-				t.Errorf("termproof: render gif: %v", err)
+				t.Errorf("termoscope: render gif: %v", err)
 				return
 			}
 			writeFile(t, filepath.Join(Dir(t), "recording.gif"), g)
 		case <-time.After(5 * time.Second):
-			t.Error("termproof: recorder did not finish")
+			t.Error("termoscope: recorder did not finish")
 		}
 	})
 }
@@ -147,7 +147,7 @@ func RecordWith(t *testing.T, tm *Terminal, interval time.Duration, opts svganim
 func writeFile(t *testing.T, path string, data []byte) {
 	t.Helper()
 	if err := os.WriteFile(path, data, 0o644); err != nil {
-		t.Fatalf("termproof: write %s: %v", path, err)
+		t.Fatalf("termoscope: write %s: %v", path, err)
 	}
 	t.Logf("artifact: %s", path)
 }

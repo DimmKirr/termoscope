@@ -1,7 +1,7 @@
 // Package raster rasterizes a headless terminal screen into a hi-DPI RGBA
 // image: JetBrains Mono at 2x for text, Twemoji PNGs for color emoji, and
 // monochrome Noto Emoji as the fallback. It is pure: no files, no testing
-// imports. Use termproof.SavePNG to write a screenshot from a test.
+// imports. Use termoscope.SavePNG to write a screenshot from a test.
 package raster
 
 import (
@@ -19,8 +19,8 @@ import (
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
 
-	"github.com/dimmkirr/termproof/internal/fonts"
-	"github.com/dimmkirr/termproof/internal/twemoji"
+	"github.com/dimmkirr/termoscope/internal/fonts"
+	"github.com/dimmkirr/termoscope/internal/twemoji"
 )
 
 // Options controls rendering. The zero value is the default: color emoji.

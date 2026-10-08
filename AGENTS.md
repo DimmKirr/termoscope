@@ -4,10 +4,10 @@ This file provides guidance to AI coding agents (Claude Code, Codex, etc.) when 
 
 ## What this is
 
-`termproof` is a Go library plus a small CLI for testing terminal (TUI) programs. A test starts a binary under a
+`termoscope` is a Go library plus a small CLI for testing terminal (TUI) programs. A test starts a binary under a
 headless PTY, reads the emulated screen cell by cell, waits for screen states, and leaves PNG, static SVG and
 animated SVG artifacts of every run under `test/results/`. The animated SVG doubles as README/website media.
-Module path: `github.com/dimmkirr/termproof`, Go 1.26, Unix-only (needs PTYs).
+Module path: `github.com/dimmkirr/termoscope`, Go 1.26, Unix-only (needs PTYs).
 
 ## Commands
 
@@ -20,7 +20,7 @@ task tidy                    # go mod tidy
 go test ./svganim/ -run TestRender -v              # single package / test
 go test ./test/e2e/... -count=1 -v                 # worked example; artifacts in test/results/<ts>-<Test>/
 CC=cc go test -race ./...                          # on nix, -race needs the clang wrapper
-go run ./cmd/termproof record -o out.svg -cols 40 -rows 4 -- go run ./examples/countdown
+go run ./cmd/termoscope record -o out.svg -cols 40 -rows 4 -- go run ./examples/countdown
 ```
 
 Linters enabled in `.golangci.yml`: govet, staticcheck, errcheck, revive, gofmt.
@@ -32,12 +32,12 @@ gofmt/vet sweeps and never edit it. `test/results/` and `.scratch/` are gitignor
 
 ## Architecture
 
-Strict one-way dependency flow: `termproof` (root) imports `raster`, `svganim` and `gifanim`; `gifanim` imports
+Strict one-way dependency flow: `termoscope` (root) imports `raster`, `svganim` and `gifanim`; `gifanim` imports
 `raster` and `svganim`; `raster` imports `internal/fonts` and `internal/twemoji`; `svganim` imports only
 `internal/fonts` and `ultraviolet` cell types. `raster`, `svganim` and `gifanim` are pure (no files, no
 `testing`); all file writing and `*testing.T` plumbing lives in the root package.
 
-- **Root `termproof`** (`terminal.go`, `artifacts.go`)
+- **Root `termoscope`** (`terminal.go`, `artifacts.go`)
   - `Start` creates an `xpty` PTY and a `vt.SafeEmulator`, sets `TERM=xterm-256color COLORTERM=truecolor
     CLICOLOR_FORCE=1`, and runs two goroutines: one pumps PTY output into the emulator under `mu`, the other waits
     on the process and closes `exited`. Every screen read (`Screen`, `CellAt`, `Line`) takes `mu`; `CellAt`
@@ -75,7 +75,7 @@ Strict one-way dependency flow: `termproof` (root) imports `raster`, `svganim` a
   `raster.Pad` then adds `Padding` (default `raster.Margin`, one cell height in 2x px, halved at Scale 1) on every
   side, so the GIF canvas equals the SVG canvas. Leading content-less frames (the empty screen sampled before
   the program printed) are dropped and timestamps rebased, so static GIF previews show content.
-  `termproof.SavePNG` and the CLI PNG path do the same crop and pad via
+  `termoscope.SavePNG` and the CLI PNG path do the same crop and pad via
   `raster.Trim` (crop to content cells, honoring min size) followed by `raster.Pad`. The palette is exact while the recording
   has at most 256 distinct colors, else the 40 most frequent colors plus a 6x6x6 cube. Delays are centiseconds
   between frame timestamps, the last frame holds for `Hold`, `LoopCount` 0. Depends on `raster` and `svganim`;
@@ -84,7 +84,7 @@ Strict one-way dependency flow: `termproof` (root) imports `raster`, `svganim` a
   instance from Google Fonts; TTF for raster, WOFF for SVG) plus the em metrics both renderers share. Both fonts
   are OFL-licensed; keep `OFL.txt` and `OFL-NotoEmoji.txt` alongside. Go's `x/image` cannot render color fonts
   (CBDT/COLR/sbix), which is why the bundled emoji face is the monochrome Noto Emoji.
-- **`cmd/termproof`**: `record` subcommand wrapping `Start` + `svganim.Record` + `raster.Render`. Exit code is the
+- **`cmd/termoscope`**: `record` subcommand wrapping `Start` + `svganim.Record` + `raster.Render`. Exit code is the
   child's; the recording is written regardless.
 
 The `Screen` interface (`Width`, `Height`, `CellAt`) is duplicated in `raster` and `svganim` rather than shared so

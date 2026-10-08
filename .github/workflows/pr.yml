@@ -38,14 +38,14 @@ jobs:
           mkdir -p dist/examples
           for dir in examples/*/; do
             name=$(basename "$dir")
-            go run ./cmd/termproof record \
+            go run ./cmd/termoscope record \
               -o "dist/examples/$name.svg" -png "dist/examples/$name.png" -gif "dist/examples/$name.gif" \
               -cols 40 -rows 4 -- go run "./$dir"
           done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: termproof-pr-${{ github.event.pull_request.number }}
+          name: termoscope-pr-${{ github.event.pull_request.number }}
           path: |
             dist/examples/
             test/results/

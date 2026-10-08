@@ -39,9 +39,9 @@ jobs:
           go-version-file: go.mod
       - name: Build CLI
         run: |
-          out="termproof_${GITHUB_REF_NAME}_${GOOS}_${GOARCH}"
+          out="termoscope_${GITHUB_REF_NAME}_${GOOS}_${GOARCH}"
           mkdir -p dist
-          go build -trimpath -ldflags "-s -w" -o "dist/$out/termproof" ./cmd/termproof
+          go build -trimpath -ldflags "-s -w" -o "dist/$out/termoscope" ./cmd/termoscope
           cp LICENSE README.md "dist/$out/"
           tar -C dist -czf "dist/$out.tar.gz" "$out"
       - uses: actions/upload-artifact@v4
@@ -62,7 +62,7 @@ jobs:
           mkdir -p dist/examples
           for dir in examples/*/; do
             name=$(basename "$dir")
-            go run ./cmd/termproof record \
+            go run ./cmd/termoscope record \
               -o "dist/examples/$name.svg" -png "dist/examples/$name.png" -gif "dist/examples/$name.gif" \
               -cols 40 -rows 4 -- go run "./$dir"
           done

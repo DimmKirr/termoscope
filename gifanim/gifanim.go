@@ -18,8 +18,8 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 	xdraw "golang.org/x/image/draw"
 
-	"github.com/dimmkirr/termproof/raster"
-	"github.com/dimmkirr/termproof/svganim"
+	"github.com/dimmkirr/termoscope/raster"
+	"github.com/dimmkirr/termoscope/svganim"
 )
 
 // Options controls encoding. Zero values take the documented defaults.

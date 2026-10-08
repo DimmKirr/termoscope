@@ -1,4 +1,4 @@
-// Command emoji is a tiny in-place updating TUI used by termproof's own
+// Command emoji is a tiny in-place updating TUI used by termoscope's own
 // tests and README to prove wide emoji cells render and align. It draws a
 // release checklist whose steps flip from pending to done, then exits 0.
 //

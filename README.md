@@ -1,6 +1,6 @@
-# termproof
+# termoscope
 
-Proof of what a terminal program showed. termproof runs a binary under a
+Proof of what a terminal program showed. termoscope runs a binary under a
 headless pseudo-terminal inside `go test`, lets you wait for and assert on
 screen cells, and leaves a PNG, a static SVG, an animated SVG and an animated
 GIF recording of every run for visual QA by humans or an LLM and for README
@@ -20,13 +20,13 @@ and website use.
 - JetBrains Mono, Twemoji and Noto Emoji are embedded, so PNG and GIF
   renders look the same on every machine, color emoji included. About
   5 MB of assets in the binary.
-- A `termproof record` CLI for recording README animations.
+- A `termoscope record` CLI for recording README animations.
 
 ## Install
 
 ```sh
-go get github.com/dimmkirr/termproof
-go install github.com/dimmkirr/termproof/cmd/termproof@latest
+go get github.com/dimmkirr/termoscope
+go install github.com/dimmkirr/termoscope/cmd/termoscope@latest
 ```
 
 Requires Go 1.26 and a Unix-like OS that can open PTYs.
@@ -42,16 +42,16 @@ func TestExample_Countdown(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	tm, err := termproof.Start(ctx, 40, 4, bin, "-pace=120ms")
+	tm, err := termoscope.Start(ctx, 40, 4, bin, "-pace=120ms")
 	if err != nil {
 		t.Fatal(err)
 	}
-	termproof.Record(t, tm) // recording.svg written on cleanup
+	termoscope.Record(t, tm) // recording.svg written on cleanup
 
 	if _, err := tm.WaitFor(ctx, "Countdown"); err != nil {
 		t.Fatal(err)
 	}
-	termproof.SavePNG(t, tm, "start")
+	termoscope.SavePNG(t, tm, "start")
 
 	if _, err := tm.WaitFor(ctx, "Liftoff"); err != nil {
 		t.Fatal(err)
@@ -59,8 +59,8 @@ func TestExample_Countdown(t *testing.T) {
 	if err := tm.Wait(); err != nil {
 		t.Fatalf("countdown exited with %v", err)
 	}
-	termproof.SavePNG(t, tm, "liftoff")
-	termproof.SaveSVG(t, tm, "liftoff")
+	termoscope.SavePNG(t, tm, "liftoff")
+	termoscope.SaveSVG(t, tm, "liftoff")
 
 	for _, x := range []int{11, 13, 15} {
 		c := tm.CellAt(x, 0)
@@ -83,7 +83,7 @@ ls test/results/*/
 
 | Package | Purpose |
 |---|---|
-| `termproof` | `Start`, `Terminal` (`Screen`, `Line`, `CellAt`, `Send`, `SendLine`, `WaitFor`, `WaitUntil`, `Done`, `Wait`, `Close`), `StripANSI`, test helpers `Dir`, `SavePNG`, `SaveSVG`, `Record`, `RecordWith`, `SetResultsRoot` |
+| `termoscope` | `Start`, `Terminal` (`Screen`, `Line`, `CellAt`, `Send`, `SendLine`, `WaitFor`, `WaitUntil`, `Done`, `Wait`, `Close`), `StripANSI`, test helpers `Dir`, `SavePNG`, `SaveSVG`, `Record`, `RecordWith`, `SetResultsRoot` |
 | `raster` | Pure screen to `*image.RGBA` at 2x; `Render`, `RenderWith`, `Options{MonoEmoji}` |
 | `svganim` | `Snapshot`, `Record`, `Render`, `RenderStatic`, `Options` (incl. `EmbedEmoji`), `Bounds` |
 | `gifanim` | `Render` recorded frames as an animated GIF, `Options` (`Hold`, `Scale`, `Padding`, `MinCols`, `MinRows`, `MonoEmoji`) |
@@ -99,7 +99,7 @@ Add `test/results/` to `.gitignore`.
 ## Recorder CLI
 
 ```sh
-termproof record -o demo.svg -png last.png -gif demo.gif -cols 80 -rows 24 -- ./myapp --flag
+termoscope record -o demo.svg -png last.png -gif demo.gif -cols 80 -rows 24 -- ./myapp --flag
 ```
 
 Flags: `-sample` (40ms), `-hold` (2s before the loop restarts), `-timeout`
@@ -118,7 +118,7 @@ font is embedded as a woff2 data URI; browsers honor it, librsvg does not.
 
 ## GIF rendering
 
-`Record` also writes `recording.gif`, and `termproof record -gif out.gif`
+`Record` also writes `recording.gif`, and `termoscope record -gif out.gif`
 does the same from the CLI. Output is hi-DPI (2x) by default; `-gif-scale 1`
 or `gifanim.Options{Scale: 1}` halves it for smaller files. Like the SVG, the
 canvas is cropped to the content cells and padded by one cell height on every
