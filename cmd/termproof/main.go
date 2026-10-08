@@ -14,6 +14,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"image"
 	"image/png"
 	"io"
 	"os"
@@ -21,6 +22,7 @@ import (
 	"time"
 
 	"github.com/dimmkirr/termproof"
+	"github.com/dimmkirr/termproof/gifanim"
 	"github.com/dimmkirr/termproof/raster"
 	"github.com/dimmkirr/termproof/svganim"
 )
@@ -55,6 +57,10 @@ func record(args []string, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	out := fs.String("o", "recording.svg", "animated SVG output path")
 	pngOut := fs.String("png", "", "also write the final screen as PNG to this path")
+	gifOut := fs.String("gif", "", "also write the recording as an animated GIF to this path (pixel-exact, bundled fonts, no viewer font needed)")
+	gifScale := fs.Int("gif-scale", 2, "GIF pixel scale: 2 = hi-DPI (crisp), 1 = terminal size (smaller file)")
+	pad := fs.Int("padding", raster.Margin, "background margin around content in the PNG and GIF, in 2x pixels (default one cell height; -1 = none)")
+	monoEmoji := fs.Bool("mono-emoji", false, "draw emoji in PNG and GIF with the monochrome Noto Emoji face instead of color Twemoji pictures")
 	cols := fs.Int("cols", 80, "terminal width in cells")
 	rows := fs.Int("rows", 24, "terminal height in cells")
 	sample := fs.Duration("sample", 40*time.Millisecond, "screen sampling interval")
@@ -91,8 +97,19 @@ func record(args []string, stderr io.Writer) int {
 		return 1
 	}
 	sayf(stderr, "wrote %s (%d frames)\n", *out, len(frames))
+	if *gifOut != "" {
+		data, err := gifanim.Render(frames, gifanim.Options{Hold: *hold, Scale: *gifScale, Padding: *pad, MinCols: *minCols, MinRows: *minRows, MonoEmoji: *monoEmoji})
+		if err == nil {
+			err = os.WriteFile(*gifOut, data, 0o644)
+		}
+		if err != nil {
+			say(stderr, "termproof record:", err)
+			return 1
+		}
+		sayf(stderr, "wrote %s\n", *gifOut)
+	}
 	if *pngOut != "" {
-		if err := writePNG(tm, *pngOut); err != nil {
+		if err := writePNG(raster.Trim(tm, *minCols, *minRows), *pngOut, raster.Options{MonoEmoji: *monoEmoji}, *pad); err != nil {
 			say(stderr, "termproof record:", err)
 			return 1
 		}
@@ -101,10 +118,13 @@ func record(args []string, stderr io.Writer) int {
 	return exitCode(exitErr)
 }
 
-func writePNG(s raster.Screen, path string) error {
-	img, err := raster.Render(s)
+func writePNG(s raster.Screen, path string, o raster.Options, pad int) error {
+	img, err := raster.RenderWith(s, o)
 	if err != nil {
 		return err
+	}
+	if pad > 0 {
+		img = raster.Pad([]*image.RGBA{img}, pad)[0]
 	}
 	f, err := os.Create(path)
 	if err != nil {

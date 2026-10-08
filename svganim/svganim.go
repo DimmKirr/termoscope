@@ -37,10 +37,12 @@ type Screen interface {
 }
 
 // Cell is one captured screen cell. Width is the number of columns the cell
-// occupies: 1 for ordinary text, 2 for emoji and other wide glyphs.
+// occupies: 1 for ordinary text, 2 for emoji and other wide glyphs. Bg is
+// kept for raster-based renderers (gifanim); the SVG renderer ignores it.
 type Cell struct {
 	Content string
 	Fg      color.Color // nil means the default foreground
+	Bg      color.Color // nil means the default background
 	Width   int
 }
 
@@ -78,7 +80,7 @@ func Snapshot(s Screen, at time.Duration) Frame {
 			if content == "" {
 				content = " "
 			}
-			row = append(row, Cell{Content: content, Fg: c.Style.Fg, Width: max(c.Width, 1)})
+			row = append(row, Cell{Content: content, Fg: c.Style.Fg, Bg: c.Style.Bg, Width: max(c.Width, 1)})
 		}
 		f.Lines[y] = row
 	}
@@ -94,7 +96,8 @@ func sameFrame(a, b Frame) bool {
 			return false
 		}
 		for x := range a.Lines[y] {
-			if a.Lines[y][x].Content != b.Lines[y][x].Content || a.Lines[y][x].width() != b.Lines[y][x].width() || !colorEqual(a.Lines[y][x].Fg, b.Lines[y][x].Fg) {
+			ca, cb := a.Lines[y][x], b.Lines[y][x]
+			if ca.Content != cb.Content || ca.width() != cb.width() || !colorEqual(ca.Fg, cb.Fg) || !colorEqual(ca.Bg, cb.Bg) {
 				return false
 			}
 		}

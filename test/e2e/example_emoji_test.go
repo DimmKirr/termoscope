@@ -68,7 +68,8 @@ func TestExample_Emoji(t *testing.T) {
 		t.Errorf("line 3 = %q", got)
 	}
 
-	// The PNG must contain ink inside the rocket's two-cell span: JetBrains
+	// The PNG is cropped to content and padded by raster.Margin, so the
+	// rocket's two-cell span starts at column 8 past the margin. JetBrains
 	// Mono has no emoji glyphs, so this only passes when Noto Emoji is used.
 	f, err := os.Open(pngPath)
 	if err != nil {
@@ -80,8 +81,8 @@ func TestExample_Emoji(t *testing.T) {
 		t.Fatal(err)
 	}
 	ink := 0
-	for py := 0; py < raster.CellHeight; py++ {
-		for px := 8 * raster.CellWidth; px < 10*raster.CellWidth; px++ {
+	for py := raster.Margin; py < raster.Margin+raster.CellHeight; py++ {
+		for px := raster.Margin + 8*raster.CellWidth; px < raster.Margin+10*raster.CellWidth; px++ {
 			r, g, b, _ := img.At(px, py).RGBA()
 			if r>>8 != 0x0d || g>>8 != 0x11 || b>>8 != 0x17 {
 				ink++

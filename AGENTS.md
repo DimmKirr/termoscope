@@ -32,8 +32,9 @@ gofmt/vet sweeps and never edit it. `test/results/` and `.scratch/` are gitignor
 
 ## Architecture
 
-Four packages with a strict one-way dependency flow: `termproof` (root) imports `raster` and `svganim`, both of
-which import only `internal/fonts` and `ultraviolet` cell types. `raster` and `svganim` are pure (no files, no
+Strict one-way dependency flow: `termproof` (root) imports `raster`, `svganim` and `gifanim`; `gifanim` imports
+`raster` and `svganim`; `raster` imports `internal/fonts` and `internal/twemoji`; `svganim` imports only
+`internal/fonts` and `ultraviolet` cell types. `raster`, `svganim` and `gifanim` are pure (no files, no
 `testing`); all file writing and `*testing.T` plumbing lives in the root package.
 
 - **Root `termproof`** (`terminal.go`, `artifacts.go`)
@@ -45,12 +46,19 @@ which import only `internal/fonts` and `ultraviolet` cell types. `raster` and `s
   - `artifacts.go` resolves the results root by walking up from cwd to `go.mod` (override with `SetResultsRoot`),
     and `Dir(t)` yields `test/results/<runID>-<testName>` where `runID` is one UTC timestamp fixed per test binary
     run. `Record` starts `svganim.Record` in a goroutine and writes `recording.svg` from `t.Cleanup`, closing the
-    terminal first so the recording ends where the test ends.
+    terminal first so the recording ends where the test ends. The same frames also become `recording.gif` via
+  `gifanim`, mirroring the SVG's `Hold`, `MinCols` and `MinRows`.
 - **`raster`**: screen to `*image.RGBA` at 2x using the embedded TTFs via `x/image/font/opentype`. Cell geometry
-  constants (`FontSize=28`, `CellWidth=17`, `CellHeight=35`) encode a 14px font at 2x with a 0.6em advance and
-  1.25em line. Per cell it checks the first rune against JetBrains Mono's cmap; if missing and present in Noto
-  Emoji, the glyph is drawn with the emoji face centered in the cell's `Width`-cell span. No shaping: clusters
-  draw as their first rune.
+  constants (`FontSize=32`, `CellWidth=19`, `CellHeight=38`) encode svganim's default 16px font at 2x with a 0.6em
+  advance and a 1.2em line (19.2 and 38.4 rounded), so a GIF or PNG shown at half size lines up with the SVG
+  to within 1%. Per cell: if the cell is 2 wide, contains U+FE0F, or its first rune is missing from JetBrains
+  Mono's cmap, it is emoji. Emoji are drawn from `internal/twemoji` by whole grapheme cluster (color, default),
+  scaled with CatmullRom into a square inside the `Width`-cell span and cached per cluster; with
+  `Options.MonoEmoji`, or when Twemoji has no picture, the first rune is drawn with the Noto Emoji face in the
+  fg color. The gate on JetBrains Mono's cmap keeps `#`, `*`, `©` as text even though Twemoji has pictures.
+- **`internal/twemoji`**: `go:embed` of the Twemoji 17.0.3 72px PNG set (4009 files, about 4 MB, CC-BY 4.0,
+  keep `LICENSE-GRAPHICS`). `Lookup(cluster)` maps a cluster to a file stem of hex code points joined by `-`,
+  trying the exact sequence, then without U+FE0F, then the base code point; decoded images are cached.
 - **`svganim`**: `Snapshot` copies a `Screen` into a `Frame` (skips width-0 wide-glyph continuations, keeps
   content, fg color and `Width`); `Record` samples until `Done()` closes and drops identical consecutive frames;
   `Render` emits one `<g>` per frame toggled by a CSS keyframe animation (what GitHub renders inside `<img>`),
@@ -60,6 +68,17 @@ which import only `internal/fonts` and `ultraviolet` cell types. `raster` and `s
   `<text>` so its natural advance never shifts the grid. The font-family stack is JetBrains Mono, then (if
   `Options.EmbedEmoji`) Noto Emoji, then the platform color emoji fonts, then `monospace`. JetBrains Mono woff2 is
   embedded as a data URI unless `Options.NoEmbed`; Noto Emoji woff only with `EmbedEmoji` (about 750 KB).
+- **`gifanim`**: animated GIF from `svganim.Frame`s. A `frameScreen` adapter maps each frame back onto
+  `raster.Screen` (column to cell index, continuation columns as width-0 cells) so `raster.Render` produces the
+  pixels; `Scale: 2` (default) keeps the hi-DPI raster, `Scale: 1` halves it with CatmullRom. `padToMargin` then grows the
+  `raster.Pad` then adds `Padding` (default `raster.Margin`, one cell height in 2x px, halved at Scale 1) on every
+  side, so the GIF canvas equals the SVG canvas. Leading content-less frames (the empty screen sampled before
+  the program printed) are dropped and timestamps rebased, so static GIF previews show content.
+  `termproof.SavePNG` and the CLI PNG path do the same crop and pad via
+  `raster.Trim` (crop to content cells, honoring min size) followed by `raster.Pad`. The palette is exact while the recording
+  has at most 256 distinct colors, else the 40 most frequent colors plus a 6x6x6 cube. Delays are centiseconds
+  between frame timestamps, the last frame holds for `Hold`, `LoopCount` 0. Depends on `raster` and `svganim`;
+  `svganim` must never import it.
 - **`internal/fonts`**: `go:embed` of JetBrains Mono (TTF for raster, WOFF2 for SVG) and Noto Emoji Regular (static
   instance from Google Fonts; TTF for raster, WOFF for SVG) plus the em metrics both renderers share. Both fonts
   are OFL-licensed; keep `OFL.txt` and `OFL-NotoEmoji.txt` alongside. Go's `x/image` cannot render color fonts

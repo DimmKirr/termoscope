@@ -40,7 +40,7 @@ jobs:
           for dir in examples/*/; do
             name=$(basename "$dir")
             go run ./cmd/termproof record \
-              -o "dist/examples/$name.svg" -png "dist/examples/$name.png" \
+              -o "dist/examples/$name.svg" -png "dist/examples/$name.png" -gif "dist/examples/$name.gif" \
               -cols 40 -rows 4 -- go run "./$dir"
           done
       - uses: actions/upload-artifact@v4

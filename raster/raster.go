@@ -1,6 +1,7 @@
 // Package raster rasterizes a headless terminal screen into a hi-DPI RGBA
-// image (JetBrains Mono at 2x, Noto Emoji for emoji). It is pure: no files,
-// no testing imports. Use termproof.SavePNG to write a screenshot from a test.
+// image: JetBrains Mono at 2x for text, Twemoji PNGs for color emoji, and
+// monochrome Noto Emoji as the fallback. It is pure: no files, no testing
+// imports. Use termproof.SavePNG to write a screenshot from a test.
 package raster
 
 import (
@@ -12,13 +13,30 @@ import (
 	"unicode/utf8"
 
 	uv "github.com/charmbracelet/ultraviolet"
+	xdraw "golang.org/x/image/draw"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
 
 	"github.com/dimmkirr/termproof/internal/fonts"
+	"github.com/dimmkirr/termproof/internal/twemoji"
 )
+
+// Options controls rendering. The zero value is the default: color emoji.
+type Options struct {
+	// MonoEmoji draws emoji with the monochrome Noto Emoji face in the
+	// cell's foreground color instead of the bundled Twemoji pictures.
+	MonoEmoji bool
+}
+
+var (
+	emojiMu    sync.Mutex
+	emojiCache = map[string]*image.RGBA{} // cluster → Twemoji scaled to the emoji box
+)
+
+// Background is the canvas color behind cells without an explicit background.
+var Background = color.RGBA{0x0d, 0x11, 0x17, 0xff}
 
 // Screen is the subset of a vt emulator the rasterizer needs.
 type Screen interface {
@@ -27,19 +45,21 @@ type Screen interface {
 	CellAt(x, y int) *uv.Cell
 }
 
-// Cell geometry in pixels. FontSize is the 2x (hi-DPI) size of a 14 px
-// terminal font; width is the JetBrains Mono advance (0.6 em) and height a
-// 1.25 em line, the 1:2 cell of a typical terminal. EmojiFontSize is chosen
-// so a Noto Emoji glyph fits inside the two-cell span the emulator gives it.
+// Cell geometry in pixels, matching svganim at its default 16 px font so a
+// GIF or PNG shown at half size lines up with the SVG. FontSize is the 2x
+// (hi-DPI) size of that 16 px font; a cell is one JetBrains Mono advance
+// (0.6 em = 19.2, rounded to 19) wide and two advances (38.4, rounded to
+// 38) tall. EmojiFontSize is chosen so a Noto Emoji glyph fits inside the
+// two-cell span the emulator gives it.
 const (
-	FontSize      = 28
-	CellWidth     = 17
-	CellHeight    = 35
-	EmojiFontSize = 26
+	FontSize      = 32
+	CellWidth     = 19
+	CellHeight    = 38
+	EmojiFontSize = 30
 )
 
 var (
-	defaultBg = color.RGBA{0x0d, 0x11, 0x17, 0xff}
+	defaultBg = Background
 	defaultFg = color.RGBA{0xc9, 0xd1, 0xd9, 0xff}
 
 	fontOnce  sync.Once
@@ -87,12 +107,18 @@ func hasGlyph(f *sfnt.Font, buf *sfnt.Buffer, r rune) bool {
 	return err == nil && idx != 0
 }
 
-// Render draws the screen into an RGBA image. Text is drawn with JetBrains
-// Mono; a cell whose first rune JetBrains Mono lacks but Noto Emoji has is
-// drawn with Noto Emoji, centered in the cell span the emulator assigned.
-// Multi-rune clusters (variation selectors, skin tones, ZWJ sequences) are
-// drawn as their first rune, since the rasterizer does no shaping.
-func Render(s Screen) (*image.RGBA, error) {
+// Render draws the screen into an RGBA image with default Options: text in
+// JetBrains Mono and emoji as color Twemoji pictures.
+func Render(s Screen) (*image.RGBA, error) { return RenderWith(s, Options{}) }
+
+// RenderWith draws the screen into an RGBA image. Text is drawn with
+// JetBrains Mono. A cell is treated as emoji when it is two columns wide,
+// contains U+FE0F, or its first rune is missing from JetBrains Mono; such a
+// cell is drawn from the Twemoji picture for its whole grapheme cluster
+// (so skin tones, flags and ZWJ sequences render correctly), centered in
+// the cell span. With MonoEmoji, or when Twemoji has no picture, the first
+// rune is drawn with the monochrome Noto Emoji face instead.
+func RenderWith(s Screen, o Options) (*image.RGBA, error) {
 	f, err := newFaces()
 	if err != nil {
 		return nil, err
@@ -123,7 +149,15 @@ func Render(s Screen) (*image.RGBA, error) {
 			}
 			d.Src = image.NewUniform(fg)
 			r, _ := utf8.DecodeRuneInString(c.Content)
-			if !hasGlyph(textFont, &buf, r) && hasGlyph(emojiFont, &buf, r) {
+			inText := hasGlyph(textFont, &buf, r)
+			if !o.MonoEmoji && (!inText || c.Width > 1 || strings.ContainsRune(c.Content, 0xFE0F)) {
+				if pic := colorEmoji(c.Content, span); pic != nil {
+					at := image.Pt(px+(span-pic.Bounds().Dx())/2, py+(CellHeight-pic.Bounds().Dy())/2)
+					draw.Draw(img, pic.Bounds().Add(at), pic, image.Point{}, draw.Over)
+					continue
+				}
+			}
+			if !inText && hasGlyph(emojiFont, &buf, r) {
 				drawEmoji(d, f.emoji, r, px, py, span)
 				continue
 			}
@@ -135,8 +169,32 @@ func Render(s Screen) (*image.RGBA, error) {
 	return img, nil
 }
 
-// drawEmoji draws r with the emoji face, centered both ways in a span px
-// wide starting at (px, py).
+// colorEmoji returns the Twemoji picture for cluster scaled to fit a span
+// px wide and CellHeight tall with a one pixel margin, or nil when Twemoji
+// has no picture for it. Scaled pictures are cached per cluster and span.
+func colorEmoji(cluster string, span int) *image.RGBA {
+	side := min(span, CellHeight) - 2
+	if side <= 0 {
+		return nil
+	}
+	ck := cluster + "\x00" + string(rune(side))
+	emojiMu.Lock()
+	defer emojiMu.Unlock()
+	if pic, seen := emojiCache[ck]; seen {
+		return pic
+	}
+	src, ok := twemoji.Lookup(cluster)
+	var pic *image.RGBA
+	if ok {
+		pic = image.NewRGBA(image.Rect(0, 0, side, side))
+		xdraw.CatmullRom.Scale(pic, pic.Bounds(), src, src.Bounds(), xdraw.Src, nil)
+	}
+	emojiCache[ck] = pic
+	return pic
+}
+
+// drawEmoji draws r with the monochrome emoji face, centered both ways in
+// a span px wide starting at (px, py).
 func drawEmoji(d *font.Drawer, emoji font.Face, r rune, px, py, span int) {
 	d.Face = emoji
 	bounds, adv, _ := emoji.GlyphBounds(r)
@@ -147,3 +205,56 @@ func drawEmoji(d *font.Drawer, emoji font.Face, r rune, px, py, span int) {
 	d.Dot = fixed.Point26_6{X: left, Y: baseline}
 	d.DrawString(string(r))
 }
+
+// Margin is the default background margin around content in PNG and GIF
+// output, in raster (2x) pixels: one cell height, matching svganim's
+// default Padding.
+const Margin = CellHeight
+
+// Pad returns copies of imgs with margin pixels of Background added on
+// every side. All images must share one size. A margin of zero or less
+// returns imgs unchanged.
+func Pad(imgs []*image.RGBA, margin int) []*image.RGBA {
+	if margin <= 0 || len(imgs) == 0 {
+		return imgs
+	}
+	out := make([]*image.RGBA, len(imgs))
+	for i, img := range imgs {
+		b := img.Bounds()
+		dst := image.NewRGBA(image.Rect(0, 0, b.Dx()+2*margin, b.Dy()+2*margin))
+		draw.Draw(dst, dst.Bounds(), image.NewUniform(Background), image.Point{}, draw.Src)
+		draw.Draw(dst, b.Add(image.Pt(margin, margin)), img, b.Min, draw.Src)
+		out[i] = dst
+	}
+	return out
+}
+
+// Trim returns a view of s limited to the cells that hold content: the
+// smallest grid, at least 1x1 and at least minCols x minRows, containing
+// every cell that has non-blank text or an explicit background. Rendering
+// the view yields a canvas cropped the way svganim crops its SVG.
+func Trim(s Screen, minCols, minRows int) Screen {
+	cols, rows := 1, 1
+	for y := 0; y < s.Height(); y++ {
+		for x := 0; x < s.Width(); x++ {
+			c := s.CellAt(x, y)
+			if c == nil || c.Width == 0 {
+				continue
+			}
+			if strings.TrimSpace(c.Content) == "" && c.Style.Bg == nil {
+				continue
+			}
+			cols = max(cols, x+max(c.Width, 1))
+			rows = max(rows, y+1)
+		}
+	}
+	return trimmed{s, max(cols, minCols), max(rows, minRows)}
+}
+
+type trimmed struct {
+	Screen
+	cols, rows int
+}
+
+func (t trimmed) Width() int  { return min(t.cols, t.Screen.Width()) }
+func (t trimmed) Height() int { return min(t.rows, t.Screen.Height()) }

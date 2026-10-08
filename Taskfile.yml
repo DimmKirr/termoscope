@@ -11,10 +11,10 @@ tasks:
       - go vet ./...
       - golangci-lint run ./...
   example:
-    desc: Record every example into docs/assets/<name>.svg and .png
+    desc: Record every example into docs/assets/<name>.svg, .png and .gif
     cmds:
       - mkdir -p docs/assets
-      - for d in examples/*/; do n=$(basename "$d"); go run ./cmd/termproof record -o "docs/assets/$n.svg" -png "docs/assets/$n.png" -cols 40 -rows 4 -min-cols 20 -min-rows 4 -- go run "./$d"; done
+      - for d in examples/*/; do n=$(basename "$d"); go run ./cmd/termproof record -o "docs/assets/$n.svg" -png "docs/assets/$n.png" -gif "docs/assets/$n.gif" -cols 40 -rows 4 -min-cols 20 -min-rows 4 -- go run "./$d"; done
   tidy:
     cmds:
       - go mod tidy

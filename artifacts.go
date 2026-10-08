@@ -1,6 +1,7 @@
 package termproof
 
 import (
+	"image"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dimmkirr/termproof/gifanim"
 	"github.com/dimmkirr/termproof/raster"
 	"github.com/dimmkirr/termproof/svganim"
 )
@@ -76,13 +78,16 @@ func Dir(t *testing.T) string {
 	return dir
 }
 
-// SavePNG renders the screen to <Dir>/<name>.png and returns the path.
+// SavePNG renders the screen to <Dir>/<name>.png and returns the path. Like
+// the SVG, the image is cropped to the cells holding content and padded by
+// one cell height (raster.Margin) on every side, at 2x.
 func SavePNG(t *testing.T, s raster.Screen, name string) string {
 	t.Helper()
-	img, err := raster.Render(s)
+	img, err := raster.Render(raster.Trim(s, 0, 0))
 	if err != nil {
 		t.Fatalf("termproof: render: %v", err)
 	}
+	img = raster.Pad([]*image.RGBA{img}, raster.Margin)[0]
 	path := filepath.Join(Dir(t), name+".png")
 	f, err := os.Create(path)
 	if err != nil {
@@ -106,15 +111,18 @@ func SaveSVG(t *testing.T, s svganim.Screen, name string) string {
 }
 
 // Record samples the terminal until it exits and writes <Dir>/recording.svg
-// when the test ends. Call it right after Start. The terminal is closed
-// during cleanup, so a still-running program is killed and the recording
-// ends there.
+// and <Dir>/recording.gif when the test ends. Call it right after Start.
+// The terminal is closed during cleanup, so a still-running program is
+// killed and the recording ends there. The SVG stays crisp at any zoom and
+// shows the viewer's color emoji; the GIF is pixel-exact with the bundled
+// fonts and needs nothing from the viewer.
 func Record(t *testing.T, tm *Terminal) {
 	t.Helper()
 	RecordWith(t, tm, 40*time.Millisecond, svganim.Options{})
 }
 
 // RecordWith is Record with an explicit sampling interval and SVG options.
+// The GIF mirrors the SVG's Hold, MinCols and MinRows.
 func RecordWith(t *testing.T, tm *Terminal, interval time.Duration, opts svganim.Options) {
 	t.Helper()
 	frames := make(chan []svganim.Frame, 1)
@@ -124,6 +132,12 @@ func RecordWith(t *testing.T, tm *Terminal, interval time.Duration, opts svganim
 		select {
 		case fr := <-frames:
 			writeFile(t, filepath.Join(Dir(t), "recording.svg"), svganim.Render(fr, opts))
+			g, err := gifanim.Render(fr, gifanim.Options{Hold: opts.Hold, MinCols: opts.MinCols, MinRows: opts.MinRows})
+			if err != nil {
+				t.Errorf("termproof: render gif: %v", err)
+				return
+			}
+			writeFile(t, filepath.Join(Dir(t), "recording.gif"), g)
 		case <-time.After(5 * time.Second):
 			t.Error("termproof: recorder did not finish")
 		}

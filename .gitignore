@@ -8,3 +8,4 @@ test/results/
 go.work
 go.work.sum
 .devcell/
+.DS_Store

@@ -5,13 +5,13 @@
 #f0{animation-name:k0}
 @keyframes k0{0%{opacity:1}2.7%{opacity:0}100%{opacity:0}}
 #f1{animation-name:k1}
-@keyframes k1{0%{opacity:0}2.7%{opacity:1}12%{opacity:0}100%{opacity:0}}
+@keyframes k1{0%{opacity:0}2.7%{opacity:1}13.34%{opacity:0}100%{opacity:0}}
 #f2{animation-name:k2}
-@keyframes k2{0%{opacity:0}12%{opacity:1}22.7%{opacity:0}100%{opacity:0}}
+@keyframes k2{0%{opacity:0}13.34%{opacity:1}22.68%{opacity:0}100%{opacity:0}}
 #f3{animation-name:k3}
-@keyframes k3{0%{opacity:0}22.7%{opacity:1}33.42%{opacity:0}100%{opacity:0}}
+@keyframes k3{0%{opacity:0}22.68%{opacity:1}33.36%{opacity:0}100%{opacity:0}}
 #f4{animation-name:k4}
-@keyframes k4{0%{opacity:0}33.42%{opacity:1}100%{opacity:0}100%{opacity:0}}
+@keyframes k4{0%{opacity:0}33.36%{opacity:1}100%{opacity:0}100%{opacity:0}}
 </style>
 <rect width="100%" height="100%" rx="5.84" fill="#0d1117"/>
 <g class="f" id="f0">
