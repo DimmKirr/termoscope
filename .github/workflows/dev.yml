@@ -1,0 +1,53 @@
+name: Dev
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go build ./...
+      - run: go test -race -count=1 -v ./...
+      - name: Record example animation and screenshot
+        run: |
+          mkdir -p dist/examples
+          for dir in examples/*/; do
+            name=$(basename "$dir")
+            go run ./cmd/termproof record \
+              -o "dist/examples/$name.svg" -png "dist/examples/$name.png" \
+              -cols 40 -rows 4 -- go run "./$dir"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: termproof-dev-${{ github.sha }}
+          path: |
+            dist/examples/
+            test/results/
+          if-no-files-found: error

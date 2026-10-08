@@ -1,0 +1,20 @@
+version: '3'
+
+tasks:
+  test:
+    desc: Run unit tests with the race detector (needs cgo; CC=cc on nix)
+    cmds:
+      - go test -race -count=1 ./...
+  lint:
+    cmds:
+      - test -z "$(find . -name '*.go' -not -path './.devcell/*' | xargs gofmt -l | tee /dev/stderr)"
+      - go vet ./...
+      - golangci-lint run ./...
+  example:
+    desc: Record the countdown example into docs/assets/countdown.svg
+    cmds:
+      - mkdir -p docs/assets
+      - go run ./cmd/termproof record -o docs/assets/countdown.svg -png docs/assets/countdown.png -cols 40 -rows 4 -- go run ./examples/countdown
+  tidy:
+    cmds:
+      - go mod tidy
