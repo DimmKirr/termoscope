@@ -45,7 +45,7 @@ type Screen interface {
 	CellAt(x, y int) *uv.Cell
 }
 
-// Cell geometry in pixels, matching svganim at its default 16 px font so a
+// Cell geometry in pixels, matching svg at its default 16 px font so a
 // GIF or PNG shown at half size lines up with the SVG. FontSize is the 2x
 // (hi-DPI) size of that 16 px font; a cell is one JetBrains Mono advance
 // (0.6 em = 19.2, rounded to 19) wide and two advances (38.4, rounded to
@@ -208,7 +208,7 @@ func drawEmoji(d *font.Drawer, emoji font.Face, r rune, px, py, span int) {
 }
 
 // Margin is the default background margin around content in PNG and GIF
-// output, in raster (2x) pixels: one cell height, matching svganim's
+// output, in raster (2x) pixels: one cell height, matching svg's
 // default Padding.
 const Margin = CellHeight
 
@@ -233,7 +233,7 @@ func Pad(imgs []*image.RGBA, margin int) []*image.RGBA {
 // Trim returns a view of s limited to the cells that hold content: the
 // smallest grid, at least 1x1 and at least minCols x minRows, containing
 // every cell that has non-blank text or an explicit background. Rendering
-// the view yields a canvas cropped the way svganim crops its SVG.
+// the view yields a canvas cropped the way svg crops its SVG.
 func Trim(s Screen, minCols, minRows int) Screen {
 	cols, rows := 1, 1
 	for y := 0; y < s.Height(); y++ {

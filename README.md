@@ -3,8 +3,8 @@
 Proof of what a terminal program showed. termoscope runs a binary under a
 headless pseudo-terminal inside `go test`, lets you wait for and assert on
 screen cells, and leaves a PNG, a static SVG, an animated SVG and an animated
-GIF recording of every run for visual QA by humans or an LLM and for README
-and website use.
+GIF of every run. The same files are the evidence a reviewer or a coding agent
+looks at when a test fails, and the demo you put in your README.
 
 <p>
   <img src="docs/assets/countdown.svg" alt="countdown">
@@ -12,15 +12,36 @@ and website use.
   <img src="docs/assets/emoji.gif" alt="emoji as GIF" width="230" height="115">
 </p>
 
+- **Nothing to install but Go.** No ffmpeg, no ttyd, no browser, no system
+  fonts. One `go get`, and it runs the same on a laptop and a bare CI runner.
+- **Identical pixels everywhere, color emoji included.** JetBrains Mono,
+  Twemoji and Noto Emoji are embedded, so a PNG or GIF rendered on CI matches
+  one rendered on a Mac, skin tones, flags and ZWJ sequences included.
+- **The test run is the demo.** Every `go test` rewrites its recordings, and
+  one `task example` or CI step re-records README media with the same
+  renderer, so demos are regenerated from the code instead of hand-captured.
 - Real PTY via `charmbracelet/x/xpty`, screen via the pure Go `x/vt`
-  emulator. No Chromium, no ffmpeg, no cgo at runtime.
-- Cell-level reads: text, foreground and background colors, width.
-- Waits that block on screen state instead of sleeping.
-- Artifacts under `test/results/<dateTimeISO>-<testName>/`.
-- JetBrains Mono, Twemoji and Noto Emoji are embedded, so PNG and GIF
-  renders look the same on every machine, color emoji included. About
-  5 MB of assets in the binary.
-- A `termoscope record` CLI for recording README animations.
+  emulator. Cell-level reads of text, colors and width. Waits that block on
+  screen state instead of sleeping, with the current screen in every timeout
+  error.
+- Canvas sized in cells, not pixels: `MinCols`/`MinRows` fit the content or
+  pin one size across all recordings.
+- Artifacts under `test/results/<dateTimeISO>-<testName>/`, plus a
+  `termoscope record` CLI for recording outside a test.
+
+## How it compares
+
+| | Real PTY and screen | Assert from Go code | PNG, SVG, GIF output | External tools |
+|---|---|---|---|---|
+| termoscope | yes | yes, cell-level (`WaitFor`, `CellAt`) | yes, fonts embedded | none |
+| [teatest](https://pkg.go.dev/github.com/charmbracelet/x/exp/teatest) | no, in-process Bubble Tea only | yes, model-level | text goldens | none |
+| [tuitest](https://github.com/Gaurav-Gosain/tuitest) | yes | yes, text-level | text goldens | none |
+| [VHS](https://github.com/charmbracelet/vhs) | yes | no, tape scripts only | GIF, MP4, WebM | ttyd, ffmpeg, Chromium |
+| [asciinema](https://asciinema.org) + agg | yes | no | GIF | agg, system fonts |
+
+Use teatest for fast unit tests of a Bubble Tea model. Use VHS for scripted
+demos with typing animation and window chrome. Use termoscope when the test
+that proves the screen should also leave the picture.
 
 ## Install
 
@@ -79,14 +100,24 @@ ls test/results/*/
 # liftoff.png  liftoff.svg  recording.gif  recording.svg  start.png
 ```
 
-## API
+## Packages
+
+A test imports only the root package. The renderers are separate packages
+for programs that want images without `go test` or files.
 
 | Package | Purpose |
 |---|---|
-| `termoscope` | `Start`, `Terminal` (`Screen`, `Line`, `CellAt`, `Send`, `SendLine`, `WaitFor`, `WaitUntil`, `Done`, `Wait`, `Close`), `StripANSI`, test helpers `Dir`, `SavePNG`, `SaveSVG`, `Record`, `RecordWith`, `SetResultsRoot` |
-| `raster` | Pure screen to `*image.RGBA` at 2x; `Render`, `RenderWith`, `Options{MonoEmoji}` |
-| `svganim` | `Snapshot`, `Record`, `Render`, `RenderStatic`, `Options` (incl. `EmbedEmoji`), `Bounds` |
-| `gifanim` | `Render` recorded frames as an animated GIF, `Options` (`Hold`, `Scale`, `Padding`, `MinCols`, `MinRows`, `MonoEmoji`) |
+| `termoscope` | `Start`, `Terminal` (`Screen`, `Line`, `CellAt`, `Send`, `SendLine`, `WaitFor`, `WaitUntil`, `Done`, `Wait`, `Close`), `StripANSI`, test helpers `Dir`, `SavePNG`, `SaveSVG`, `Record`, `RecordWith` with `Options`, `SetResultsRoot` |
+| `raster` | screen to `*image.RGBA` at 2x, pure |
+| `svg` | static and animated SVG from recorded frames, pure |
+| `gif` | animated GIF from recorded frames, pure |
+
+Full API: https://pkg.go.dev/github.com/dimmkirr/termoscope
+
+`RecordWith(t, tm, termoscope.Options{Hold: 3 * time.Second, MinCols: 20,
+MinRows: 4, EmbedEmoji: true})` sets the sampling interval, the hold on the
+last frame, the minimum canvas and emoji embedding once for both the SVG and
+the GIF.
 
 `Terminal` is safe to read from any goroutine while the program writes.
 `CellAt` returns a copy. `WaitUntil` errors include the current screen, so a
@@ -120,10 +151,10 @@ font is embedded as a woff2 data URI; browsers honor it, librsvg does not.
 
 `Record` also writes `recording.gif`, and `termoscope record -gif out.gif`
 does the same from the CLI. Output is hi-DPI (2x) by default; `-gif-scale 1`
-or `gifanim.Options{Scale: 1}` halves it for smaller files. Like the SVG, the
+or `gif.Options{Scale: 1}` halves it for smaller files. Like the SVG, the
 canvas is cropped to the content cells and padded by one cell height on every
 side, and so is every PNG from `SavePNG` or `-png`
-(`gifanim.Options.Padding`, `-padding`, in 2x pixels; -1 disables). The blank
+(`gif.Options.Padding`, `-padding`, in 2x pixels; -1 disables). The blank
 screen sampled before the program printed is dropped so static previews of
 the GIF show content. Frames are
 rasterized with the bundled fonts and encoded with the standard library,
@@ -137,13 +168,15 @@ most 256 colors (exact when the screen uses few colors, quantized to a
 The emulator gives emoji two columns, and all renderers keep the grid:
 text after an emoji lands on its true column.
 
+The bundled fonts and Twemoji pictures add about 5 MB to the binary.
+
 - **PNG and GIF** draw emoji in color from the bundled Twemoji pictures,
   looked up by the cell's whole grapheme cluster, so skin tones, flags and
   ZWJ sequences (👍🏽 🇨🇿 👨‍👩‍👧) render correctly with no text shaping
   and no system font. A cell counts as emoji when it is two columns wide,
   contains U+FE0F, or JetBrains Mono lacks its first code point, so `#`,
   `*` and `©` stay text. `raster.Options{MonoEmoji: true}`,
-  `gifanim.Options{MonoEmoji: true}` or `-mono-emoji` switch to the
+  `gif.Options{MonoEmoji: true}` or `-mono-emoji` switch to the
   monochrome Noto Emoji face tinted with the cell's foreground; it is also
   the fallback for anything Twemoji has no picture for.
 - **SVG** emits each emoji as its own centered `<text>` and lists the
@@ -153,7 +186,7 @@ text after an emoji lands on its true column.
   Color and Android Emoji (legacy). Browsers only consult them for glyphs
   JetBrains Mono lacks, so a README on GitHub shows the viewer's native
   color emoji. For a render that is identical everywhere, set
-  `svganim.Options{EmbedEmoji: true}` or pass `-embed-emoji`: the
+  `svg.Options{EmbedEmoji: true}` or pass `-embed-emoji`: the
   monochrome Noto Emoji is embedded as a woff data URI, adding about
   750 KB.
 
@@ -164,7 +197,7 @@ CC=cc go test -race ./...   # nix: cgo needs the clang wrapper
 golangci-lint run ./...
 ```
 
-`svganim` has two browser tests that render SVGs with headless Chromium to
+`svg` has two browser tests that render SVGs with headless Chromium to
 prove the embedded fonts (JetBrains Mono, and Noto Emoji with `EmbedEmoji`)
 are what the browser draws. They skip when no Chromium or Chrome is on
 `PATH`.

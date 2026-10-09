@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dimmkirr/termoscope/gifanim"
+	"github.com/dimmkirr/termoscope/gif"
 	"github.com/dimmkirr/termoscope/raster"
-	"github.com/dimmkirr/termoscope/svganim"
+	"github.com/dimmkirr/termoscope/svg"
 )
 
 var (
@@ -103,10 +103,10 @@ func SavePNG(t *testing.T, s raster.Screen, name string) string {
 
 // SaveSVG writes a static SVG of the screen to <Dir>/<name>.svg and returns
 // the path.
-func SaveSVG(t *testing.T, s svganim.Screen, name string) string {
+func SaveSVG(t *testing.T, s svg.Screen, name string) string {
 	t.Helper()
 	path := filepath.Join(Dir(t), name+".svg")
-	writeFile(t, path, svganim.RenderStatic(svganim.Snapshot(s, 0), svganim.Options{}))
+	writeFile(t, path, svg.RenderStatic(svg.Snapshot(s, 0), svg.Options{}))
 	return path
 }
 
@@ -118,21 +118,21 @@ func SaveSVG(t *testing.T, s svganim.Screen, name string) string {
 // fonts and needs nothing from the viewer.
 func Record(t *testing.T, tm *Terminal) {
 	t.Helper()
-	RecordWith(t, tm, 40*time.Millisecond, svganim.Options{})
+	RecordWith(t, tm, Options{})
 }
 
-// RecordWith is Record with an explicit sampling interval and SVG options.
-// The GIF mirrors the SVG's Hold, MinCols and MinRows.
-func RecordWith(t *testing.T, tm *Terminal, interval time.Duration, opts svganim.Options) {
+// RecordWith is Record with Options: sampling interval, hold, minimum
+// canvas size and emoji embedding. The SVG and the GIF share them.
+func RecordWith(t *testing.T, tm *Terminal, opts Options) {
 	t.Helper()
-	frames := make(chan []svganim.Frame, 1)
-	go func() { frames <- svganim.Record(tm, interval) }()
+	frames := make(chan []svg.Frame, 1)
+	go func() { frames <- svg.Record(tm, opts.interval()) }()
 	t.Cleanup(func() {
 		tm.Close()
 		select {
 		case fr := <-frames:
-			writeFile(t, filepath.Join(Dir(t), "recording.svg"), svganim.Render(fr, opts))
-			g, err := gifanim.Render(fr, gifanim.Options{Hold: opts.Hold, MinCols: opts.MinCols, MinRows: opts.MinRows})
+			writeFile(t, filepath.Join(Dir(t), "recording.svg"), svg.Render(fr, opts.svg()))
+			g, err := gif.Render(fr, opts.gif())
 			if err != nil {
 				t.Errorf("termoscope: render gif: %v", err)
 				return

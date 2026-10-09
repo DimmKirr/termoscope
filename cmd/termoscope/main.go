@@ -22,9 +22,9 @@ import (
 	"time"
 
 	"github.com/dimmkirr/termoscope"
-	"github.com/dimmkirr/termoscope/gifanim"
+	"github.com/dimmkirr/termoscope/gif"
 	"github.com/dimmkirr/termoscope/raster"
-	"github.com/dimmkirr/termoscope/svganim"
+	"github.com/dimmkirr/termoscope/svg"
 )
 
 func main() {
@@ -88,17 +88,17 @@ func record(args []string, stderr io.Writer) int {
 	}
 	defer tm.Close()
 
-	frames := svganim.Record(tm, *sample)
+	frames := svg.Record(tm, *sample)
 	exitErr := tm.Wait()
 
-	svg := svganim.Render(frames, svganim.Options{Hold: *hold, FontSize: *fontSize, EmbedEmoji: *embedEmoji, MinCols: *minCols, MinRows: *minRows})
+	svg := svg.Render(frames, svg.Options{Hold: *hold, FontSize: *fontSize, EmbedEmoji: *embedEmoji, MinCols: *minCols, MinRows: *minRows})
 	if err := os.WriteFile(*out, svg, 0o644); err != nil {
 		say(stderr, "termoscope record:", err)
 		return 1
 	}
 	sayf(stderr, "wrote %s (%d frames)\n", *out, len(frames))
 	if *gifOut != "" {
-		data, err := gifanim.Render(frames, gifanim.Options{Hold: *hold, Scale: *gifScale, Padding: *pad, MinCols: *minCols, MinRows: *minRows, MonoEmoji: *monoEmoji})
+		data, err := gif.Render(frames, gif.Options{Hold: *hold, Scale: *gifScale, Padding: *pad, MinCols: *minCols, MinRows: *minRows, MonoEmoji: *monoEmoji})
 		if err == nil {
 			err = os.WriteFile(*gifOut, data, 0o644)
 		}

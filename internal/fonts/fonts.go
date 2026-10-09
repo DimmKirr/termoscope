@@ -25,7 +25,7 @@ var JetBrainsMonoWOFF2 []byte
 var NotoEmojiTTF []byte
 
 // NotoEmojiWOFF is the same face as a web font, embedded into SVGs only on
-// request (svganim.Options.EmbedEmoji) because of its size.
+// request (svg.Options.EmbedEmoji) because of its size.
 //
 //go:embed NotoEmoji-Regular.woff
 var NotoEmojiWOFF []byte
