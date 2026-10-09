@@ -9,7 +9,9 @@ import (
 
 // Options tunes what RecordWith records and renders. The zero value is
 // what Record uses. Fields that apply to both the SVG and the GIF are set
-// once here so the two recordings always agree.
+// once here so the two recordings always agree. A new knob that both
+// recordings should share belongs here, mapped onto svg.Options and
+// gif.Options below, rather than in one renderer's options alone.
 type Options struct {
 	Interval   time.Duration // sampling interval, default 40ms
 	Hold       time.Duration // how long the last frame stays before looping, default 2s

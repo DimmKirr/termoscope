@@ -1,12 +1,22 @@
-// Package termoscope runs a program under a headless pseudo-terminal so a
-// test can read what a user would see, wait for screen states, and keep
-// PNG and animated SVG evidence of every checked screen.
+// Package termoscope tests terminal (TUI) programs: it runs a binary under
+// a headless pseudo-terminal so a test can read the screen cell by cell,
+// wait for screen states, and keep PNG, static SVG, animated SVG and
+// animated GIF evidence of every checked screen. Fonts and color emoji are
+// embedded, so the images are identical on a laptop and on CI with nothing
+// installed but Go.
 //
-// A typical test builds its binary, calls [Start], registers [Record] so a
-// recording.svg lands beside the screenshots, waits with [Terminal.WaitFor]
-// or [Terminal.WaitUntil], and calls [SavePNG] and [SaveSVG] at each
-// assertion point. Artifacts go to test/results/<dateTimeISO>-<testName>/
-// under the module root of the test being run.
+// A typical test builds its binary, calls [Start], registers [Record] so
+// recording.svg and recording.gif land beside the screenshots, waits with
+// [Terminal.WaitFor] or [Terminal.WaitUntil], and calls [SavePNG] and
+// [SaveSVG] at each assertion point. Artifacts go to
+// test/results/<dateTimeISO>-<testName>/ under the module root of the test
+// being run. See the Examples below and test/e2e in the repository.
+//
+// Not yet supported: text attributes other than foreground and background
+// color (bold, italic, underline are dropped by the renderers), the cursor,
+// scrollback, and Windows. The scope and the list of planned work are in
+// README.md; CONTRIBUTING.md explains where each piece lives. The renderers
+// are small, and small pull requests usually land within a day.
 package termoscope
 
 import (
@@ -39,7 +49,7 @@ type Terminal struct {
 func Start(ctx context.Context, width, height int, name string, args ...string) (*Terminal, error) {
 	pty, err := xpty.NewPty(width, height)
 	if err != nil {
-		return nil, fmt.Errorf("create pty: %w", err)
+		return nil, fmt.Errorf("create pty (needs a Unix pseudo-terminal; see https://github.com/dimmkirr/termoscope/issues for platform support): %w", err)
 	}
 	emu := vt.NewSafeEmulator(width, height)
 	cmd := exec.CommandContext(ctx, name, args...)

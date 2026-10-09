@@ -103,7 +103,9 @@ ls test/results/*/
 ## Packages
 
 A test imports only the root package. The renderers are separate packages
-for programs that want images without `go test` or files.
+for programs that want images without `go test` or files. They are pure
+and take any `Screen` (`Width`, `Height`, `CellAt`), so a program with its
+own screen source can render through them without forking.
 
 | Package | Purpose |
 |---|---|
@@ -201,6 +203,23 @@ golangci-lint run ./...
 prove the embedded fonts (JetBrains Mono, and Noto Emoji with `EmbedEmoji`)
 are what the browser draws. They skip when no Chromium or Chrome is on
 `PATH`.
+
+## Not yet
+
+Known gaps, so a missing feature is read as a backlog item rather than a
+design choice. Each names the package to touch; see
+[CONTRIBUTING.md](CONTRIBUTING.md) for setup, and
+[CHANGELOG.md](CHANGELOG.md) for what landed when.
+
+| Gap | Status |
+|---|---|
+| Bold, italic, underline, strikethrough, reverse | Dropped by `raster` and `svg`; only fg and bg color are rendered. Planned. |
+| Cursor | Not drawn in any artifact. Planned as an option in `raster` and `svg`. |
+| Scrollback | Only the visible screen is kept; `Terminal` reads the emulator's current grid. |
+| Mouse | No helper; `Send` writes raw bytes, so SGR mouse sequences work by hand. |
+| Windows | Untested. `xpty` has ConPTY support, the rest of the code assumes Unix. |
+| GIF colors | At most 256 per recording, quantized above that (`gif`). |
+| Video (MP4, WebM), typing animation, window chrome | Out of scope; use VHS. |
 
 ## Consumers
 
