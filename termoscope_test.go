@@ -138,9 +138,13 @@ func TestRecord_WritesRecordingOnCleanup(t *testing.T) {
 		}
 		_ = tm.Wait()
 	})
-	data, err := os.ReadFile(filepath.Join(dir, "recording.svg"))
+	matches, _ := filepath.Glob(filepath.Join(dir, "*-recording.svg"))
+	if len(matches) == 0 {
+		t.Fatalf("recording.svg missing in %s", dir)
+	}
+	data, err := os.ReadFile(matches[0])
 	if err != nil {
-		t.Fatalf("recording.svg missing: %v", err)
+		t.Fatalf("recording.svg unreadable: %v", err)
 	}
 	if n := strings.Count(string(data), `class="f"`); n < 2 {
 		t.Fatalf("recording should hold at least 2 frames, got %d", n)

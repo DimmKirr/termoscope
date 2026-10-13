@@ -36,8 +36,9 @@ func ExampleStart() {
 
 // ExampleRecord is the test flow, a copy of test/e2e/example_countdown_test.go
 // in the repository: the body of a TestXxx that records every frame and
-// leaves start.png, liftoff.png, liftoff.svg, recording.svg and
-// recording.gif under test/results/<dateTimeISO>-<testName>/.
+// leaves <dateTimeISO>-start.png, <dateTimeISO>-liftoff.png,
+// <dateTimeISO>-liftoff.svg, <dateTimeISO>-recording.svg and
+// <dateTimeISO>-recording.gif under test/results/<dateTimeISO>-<testName>/.
 func ExampleRecord() {
 	testCountdown := func(t *testing.T) {
 		bin := "./countdown" // normally built into t.TempDir() with go build
@@ -48,7 +49,7 @@ func ExampleRecord() {
 		if err != nil {
 			t.Fatal(err)
 		}
-		termoscope.Record(t, tm) // recording.svg and recording.gif written on cleanup
+		termoscope.Record(t, tm) // <dateTimeISO>-recording.svg and .gif on cleanup
 
 		if _, err := tm.WaitFor(ctx, "Countdown"); err != nil {
 			t.Fatal(err)

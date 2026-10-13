@@ -72,10 +72,15 @@ func TestExample_Countdown(t *testing.T) {
 
 	// Artifacts exist and are not empty.
 	dir := termoscope.Dir(t)
-	for _, name := range []string{"start.png", "liftoff.png", "liftoff.svg"} {
-		st, err := os.Stat(filepath.Join(dir, name))
+	for _, suffix := range []string{"-start.png", "-liftoff.png", "-liftoff.svg"} {
+		matches, _ := filepath.Glob(filepath.Join(dir, "*"+suffix))
+		if len(matches) == 0 {
+			t.Errorf("artifact *%s missing in %s", suffix, dir)
+			continue
+		}
+		st, err := os.Stat(matches[0])
 		if err != nil || st.Size() == 0 {
-			t.Errorf("artifact %s missing or empty: %v", name, err)
+			t.Errorf("artifact %s empty: %v", matches[0], err)
 		}
 	}
 }

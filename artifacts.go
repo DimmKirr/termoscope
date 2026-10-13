@@ -78,7 +78,7 @@ func Dir(t *testing.T) string {
 	return dir
 }
 
-// SavePNG renders the screen to <Dir>/<name>.png and returns the path. Like
+// SavePNG renders the screen to <Dir>/<dateTimeISO>-<name>.png and returns the path. Like
 // the SVG, the image is cropped to the cells holding content and padded by
 // one cell height (raster.Margin) on every side, at 2x.
 func SavePNG(t *testing.T, s raster.Screen, name string) string {
@@ -88,7 +88,7 @@ func SavePNG(t *testing.T, s raster.Screen, name string) string {
 		t.Fatalf("termoscope: render: %v", err)
 	}
 	img = raster.Pad([]*image.RGBA{img}, raster.Margin)[0]
-	path := filepath.Join(Dir(t), name+".png")
+	path := filepath.Join(Dir(t), filePrefix()+"-"+name+".png")
 	f, err := os.Create(path)
 	if err != nil {
 		t.Fatalf("termoscope: create %s: %v", path, err)
@@ -101,17 +101,18 @@ func SavePNG(t *testing.T, s raster.Screen, name string) string {
 	return path
 }
 
-// SaveSVG writes a static SVG of the screen to <Dir>/<name>.svg and returns
-// the path.
+// SaveSVG writes a static SVG of the screen to <Dir>/<dateTimeISO>-<name>.svg
+// and returns the path.
 func SaveSVG(t *testing.T, s svg.Screen, name string) string {
 	t.Helper()
-	path := filepath.Join(Dir(t), name+".svg")
+	path := filepath.Join(Dir(t), filePrefix()+"-"+name+".svg")
 	writeFile(t, path, svg.RenderStatic(svg.Snapshot(s, 0), svg.Options{}))
 	return path
 }
 
-// Record samples the terminal until it exits and writes <Dir>/recording.svg
-// and <Dir>/recording.gif when the test ends. Call it right after Start.
+// Record samples the terminal until it exits and writes
+// <Dir>/<dateTimeISO>-recording.svg and <Dir>/<dateTimeISO>-recording.gif
+// when the test ends. Call it right after Start.
 // The terminal is closed during cleanup, so a still-running program is
 // killed and the recording ends there. The SVG stays crisp at any zoom and
 // shows the viewer's color emoji; the GIF is pixel-exact with the bundled
@@ -131,17 +132,24 @@ func RecordWith(t *testing.T, tm *Terminal, opts Options) {
 		tm.Close()
 		select {
 		case fr := <-frames:
-			writeFile(t, filepath.Join(Dir(t), "recording.svg"), svg.Render(fr, opts.svg()))
+			pfx := filePrefix()
+			writeFile(t, filepath.Join(Dir(t), pfx+"-recording.svg"), svg.Render(fr, opts.svg()))
 			g, err := gif.Render(fr, opts.gif())
 			if err != nil {
 				t.Errorf("termoscope: render gif: %v", err)
 				return
 			}
-			writeFile(t, filepath.Join(Dir(t), "recording.gif"), g)
+			writeFile(t, filepath.Join(Dir(t), pfx+"-recording.gif"), g)
 		case <-time.After(5 * time.Second):
 			t.Error("termoscope: recorder did not finish")
 		}
 	})
+}
+
+func filePrefix() string {
+	rootMu.Lock()
+	defer rootMu.Unlock()
+	return runID
 }
 
 func writeFile(t *testing.T, path string, data []byte) {
