@@ -6,6 +6,17 @@ Release binaries and the same notes: https://github.com/DimmKirr/termoscope/rele
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-13
+
+### Added
+
+- feat(termoscope): prefix every PNG, static SVG and recording file name with the run timestamp (`<dateTimeISO>-<name>.png`, `<dateTimeISO>-recording.svg`) — artifacts stay identifiable by run once copied out of `test/results/`; tests that read `recording.svg` by its fixed name must glob for `*-recording.svg`
+
+### Changed
+
+- docs(termoscope): update the SavePNG, SaveSVG, Record and ExampleRecord comments to show the prefixed names — docs match what lands on disk
+- test(termoscope): glob for the prefixed artifact names in the unit, e2e and Example tests — the suite passes with the new naming
+
 ## [0.3.0] - 2026-10-09
 
 ### Removed
@@ -28,7 +39,13 @@ Release binaries and the same notes: https://github.com/DimmKirr/termoscope/rele
 
 - docs(termoscope): rewrite the package comment, add a README "Not yet" table of known gaps, CONTRIBUTING.md and CHANGELOG.md — readers see the scope, the gaps and where a change belongs
 - docs(agents): document options.go and the RecordWith contract in AGENTS.md — no user-facing impact
-- chore(ci): build and publish releases with GoReleaser instead of a hand-written matrix — release assets are the CLI archives and checksums; the example SVG, PNG and GIF recordings are no longer attached
+
+## [0.2.1] - 2026-10-08
+
+### Changed
+
+- chore(ci): build the termoscope CLI with GoReleaser (linux/darwin, amd64/arm64, tar.gz with LICENSE and README, checksums.txt) and attach the archives to the GitHub release — tagged releases ship downloadable binaries again; v0.2.0 was published without any because the previous workflow failed on an already-existing release
+- chore(ci): drop the per-release example media job — the SVG, PNG and GIF assets are committed under docs/assets and still recorded on every push and PR
 
 ## [0.2.0] - 2026-10-08
 
@@ -62,8 +79,10 @@ Release binaries and the same notes: https://github.com/DimmKirr/termoscope/rele
 - Initial release: headless PTY testing with PNG and animated SVG evidence.
 - Emoji support in the PTY screen, PNG rasterizer and SVG recorder.
 
-[Unreleased]: https://github.com/DimmKirr/termoscope/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/DimmKirr/termoscope/compare/v0.2.0...v0.3.0
+[Unreleased]: https://github.com/DimmKirr/termoscope/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/DimmKirr/termoscope/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/DimmKirr/termoscope/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/DimmKirr/termoscope/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/DimmKirr/termoscope/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/DimmKirr/termoscope/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/DimmKirr/termoscope/commits/v0.1.0
